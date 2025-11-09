@@ -1,0 +1,33 @@
+name: CI/CD
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        perl: ["5.42", "5.40", "5.38", "5.36"]
+
+    name: Perl ${{ matrix.perl }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup perl
+        uses: shogo82148/actions-setup-perl@v1
+        with:
+          perl-version: ${{ matrix.perl }}
+
+      - name: Install cpanm
+        run: curl -L https://cpanmin.us | perl - App::cpanminus
+
+      - name: Install dependencies
+        run: cpanm -nq --installdeps --with-develop --with-recommends .
+
+      - name: Run test
+        run: prove -lr t
