@@ -59,9 +59,21 @@ prove -lr t
 
 ## ⚠️ 注意事項
 
-- `tools/update_sheet.pl` はリポジトリに含めません（社内専用）
-- Google Sheets 連携用のスクリプトは別途ローカルで管理してください
-- 認証情報（Google APIなど）は `.gitignore` 済みです
+- Google Sheets 連携は `author/update_google_sheet_from_mirror.pl` と GitHub Actions で実行します
+- GitHub Actions には `SIRONEKOTORO_CLIENT_ID` `SIRONEKOTORO_CLIENT_SECRET` `SIRONEKOTORO_REFRESH_TOKEN` の repository secrets が必要です
+- 同期状態は `.github/state/last_synced_updated_at` で管理します
+
+---
+
+## 🔄 Google Sheets Sync
+
+GitHub Actions から毎日日本時間 9:00 に `zengin-data-mirror` の更新を確認し、変更があれば Google Sheets を更新します。
+
+- 対象シート: `銀行`, `支店`, `解説`
+- 更新判定: `zengin-data-mirror/data/updated_at`
+- 解説シート:
+  - `データ更新日: <mirror updated_at>`
+  - `反映日時: <workflow 実行日時>`
 
 ---
 

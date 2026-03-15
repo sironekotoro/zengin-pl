@@ -1,0 +1,85 @@
+name: Update Google Sheet
+
+on:
+  schedule:
+    - cron: '0 0 * * *' # Every day at 09:00 JST
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  sync-google-sheet:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+
+      - name: Setup perl
+        uses: shogo82148/actions-setup-perl@v1
+        with:
+          perl-version: '5.40'
+
+      - name: Install cpanm
+        run: curl -L https://cpanmin.us | perl - App::cpanminus
+
+      - name: Install dependencies
+        run: cpanm -nq --installdeps --with-develop --with-recommends .
+
+      - name: Read mirror updated_at
+        run: |
+          mirror_updated_at="$(curl -fsSL https://raw.githubusercontent.com/sironekotoro/zengin-data-mirror/main/data/updated_at)"
+          echo "MIRROR_UPDATED_AT=${mirror_updated_at}" >> "$GITHUB_ENV"
+
+      - name: Read last synced updated_at
+        run: |
+          if [ -f .github/state/last_synced_updated_at ]; then
+            last_synced_updated_at="$(tr -d '\r\n' < .github/state/last_synced_updated_at)"
+          else
+            last_synced_updated_at=""
+          fi
+          echo "LAST_SYNCED_UPDATED_AT=${last_synced_updated_at}" >> "$GITHUB_ENV"
+
+      - name: Decide whether to sync
+        run: |
+          if [ "${MIRROR_UPDATED_AT}" = "${LAST_SYNCED_UPDATED_AT}" ]; then
+            echo "SHOULD_SYNC=false" >> "$GITHUB_ENV"
+            echo "No update since ${LAST_SYNCED_UPDATED_AT}. Skipping."
+          else
+            echo "SHOULD_SYNC=true" >> "$GITHUB_ENV"
+            echo "Detected update ${MIRROR_UPDATED_AT}. Starting Google Sheets sync."
+          fi
+
+      - name: Update Google Sheet
+        if: env.SHOULD_SYNC == 'true'
+        env:
+          SIRONEKOTORO_CLIENT_ID: ${{ secrets.SIRONEKOTORO_CLIENT_ID }}
+          SIRONEKOTORO_CLIENT_SECRET: ${{ secrets.SIRONEKOTORO_CLIENT_SECRET }}
+          SIRONEKOTORO_REFRESH_TOKEN: ${{ secrets.SIRONEKOTORO_REFRESH_TOKEN }}
+          MIRROR_UPDATED_AT: ${{ env.MIRROR_UPDATED_AT }}
+        run: |
+          synced_at="$(TZ=Asia/Tokyo date '+%Y-%m-%d %H:%M:%S JST')"
+          MIRROR_UPDATED_AT="${MIRROR_UPDATED_AT}" \
+          SYNCED_AT="${synced_at}" \
+          perl author/update_google_sheet_from_mirror.pl
+
+      - name: Update sync state file
+        if: env.SHOULD_SYNC == 'true'
+        run: |
+          printf '%s\n' "${MIRROR_UPDATED_AT}" > .github/state/last_synced_updated_at
+
+      - name: Commit sync state
+        if: env.SHOULD_SYNC == 'true'
+        run: |
+          if git diff --quiet -- .github/state/last_synced_updated_at; then
+            echo "State file is unchanged."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add .github/state/last_synced_updated_at
+          git commit -m "chore: synced Google Sheet for ${MIRROR_UPDATED_AT}"
+          git push
