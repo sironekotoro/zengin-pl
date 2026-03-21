@@ -141,8 +141,6 @@ Perl から簡単に取得・操作するための軽量クライアントです
 
 =over 4
 
-=item L<https://github.com/zengin-code/source-data>
-
 =item L<https://raw.githubusercontent.com/sironekotoro/zengin-data-mirror/main/data/banks.json>
 
 =item L<https://raw.githubusercontent.com/sironekotoro/zengin-data-mirror/main/data/branches/0001.json>
@@ -161,8 +159,9 @@ Perl から簡単に取得・操作するための軽量クライアントです
 
 =item * base_url
 
-JSON データの取得先URLを指定します。
-デフォルトは C<https://raw.githubusercontent.com/sironekotoro/zengin-data-mirror/main/data> です。
+JSON データの取得先 URL を指定します。
+デフォルトでは C<https://raw.githubusercontent.com/sironekotoro/zengin-data-mirror/main/data>
+を参照します。
 
 =back
 
