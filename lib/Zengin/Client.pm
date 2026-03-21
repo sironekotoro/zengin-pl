@@ -54,7 +54,7 @@ sub get_branch {
 #
 # 戻り値：
 #  ・引数1つの場合…マッチした銀行のハッシュリファレンスを要素に持つ配列リファレンス
-#  ・引数2つの場合…{ bank => 銀行HR, branch => 支店HR } を要素に持つ配列リファレンス
+#  ・引数2つの場合…マッチした支店のハッシュリファレンスを要素に持つ配列リファレンス
 #
 sub search {
     my ( $self, $bank_pat, $branch_pat ) = @_;
@@ -111,31 +111,26 @@ Zengin::Client - Lightweight Perl client for Zengin Code (全銀協コード) JS
 =head1 SYNOPSIS
 
     use Zengin::Client;
-    use feature 'say';
 
     my $client = Zengin::Client->new();
 
-    # 銀行一覧を取得
-    my $banks = $client->get_all_banks();
-    say $_->{name} for values %$banks;    # 全銀行名を出力
+    # 銀行名で検索
+    my $banks = $client->search('みずほ');
+    printf "%s: %s\n", $_->{code}, $_->{name} for @$banks;
 
-    # 支店一覧を取得
-    my $branches = $client->get_branches("0001");
-    say $_->{name} for values %$branches; # みずほ銀行の支店名を出力
+    # 銀行名 + 支店名で検索
+    my $branches = $client->search('みずほ', '東京');
+    printf "%s: %s\n", $_->{code}, $_->{name} for @$branches;
+
+    # 全銀行一覧を取得
+    my $all_banks = $client->get_all_banks();
+    printf "%s: %s\n", $_, $all_banks->{$_}->{name} for sort keys %$all_banks;
 
     # 単一の銀行／支店を取得
-    my $bank   = $client->get_bank("0001");
-    say $bank->{name};                    # みずほ銀行
-    my $branch = $client->get_branch("0001", "001");
-    say $branch->{name};                  # 東京営業部
-
-    # 曖昧検索：銀行名のみ
-    my $mizubanks = $client->search("みずほ");
-    say $_->{code}, ":", $_->{name} for @$mizubanks;
-
-    # 曖昧検索：銀行名＋支店名
-    my $tokyobranches = $client->search("みずほ", "東京");
-    say $_->{code}, ":", $_->{name} for @$tokyobranches;
+    my $bank   = $client->get_bank('0001');
+    my $branch = $client->get_branch('0001', '001');
+    printf "%s\n", $bank->{name};
+    printf "%s\n", $branch->{name};
 
 =head1 DESCRIPTION
 
@@ -146,11 +141,11 @@ Perl から簡単に取得・操作するための軽量クライアントです
 
 =over 4
 
-=item * L<https://github.com/zengin-code/source-data>
+=item L<https://github.com/zengin-code/source-data>
 
-=item * L<https://raw.githubusercontent.com/sironekotoro/zengin-data-mirror/main/data/banks.json>
+=item L<https://raw.githubusercontent.com/sironekotoro/zengin-data-mirror/main/data/banks.json>
 
-=item * L<https://raw.githubusercontent.com/sironekotoro/zengin-data-mirror/main/data/branches/0001.json>
+=item L<https://raw.githubusercontent.com/sironekotoro/zengin-data-mirror/main/data/branches/0001.json>
 
 =back
 
@@ -166,7 +161,8 @@ Perl から簡単に取得・操作するための軽量クライアントです
 
 =item * base_url
 
-JSON データの取得先URLを指定（デフォルトは zengin-code/source-data のraw URL）
+JSON データの取得先URLを指定します。
+デフォルトは C<https://raw.githubusercontent.com/sironekotoro/zengin-data-mirror/main/data> です。
 
 =back
 
@@ -214,21 +210,11 @@ JSON データの取得先URLを指定（デフォルトは zengin-code/source-d
 
 部分一致または正規表現で銀行名／支店名を検索します。
 
-# 引数１つ：銀行名のみ検索
-my $banks = $client->search('みずほ');
-# -> [
-#      { code => '0001', name => 'みずほ銀行', kana => 'ミズホ', hira => 'みずほ', roma => 'mizuho' },
-#      { code => '9990', name => 'みずほ信託銀行', ... },
-#      ...
-#    ]
+    # 引数1つ: 銀行名のみ検索
+    my $banks = $client->search('みずほ');
 
-# 引数２つ：銀行名＋支店名検索
-my $branches = $client->search('みずほ', '東京');
-# -> [
-#      { code => '001', name => '東京営業部', kana => 'トウキヨウ', hira => 'とうきょう', roma => 'toukyou' },
-#      { code => '002', name => '東京中央支店', ... },
-#      ...
-#    ]
+    # 引数2つ: 銀行名 + 支店名検索
+    my $branches = $client->search('みずほ', '東京');
 
 引数１つの場合は `get_all_banks` の結果から銀行だけをフィルタした配列リファレンス、
 引数２つの場合は `get_branches` の結果から支店だけをフィルタした配列リファレンスを返します。
