@@ -96,3 +96,11 @@ MIT License
 ## Compatibility
 
 既存コード向けに `Zengin::Client` も引き続き利用できますが、新規利用では `Zengin::Pl` を使ってください。
+
+## Development
+
+このディストリビューションは Minilla で管理しています。`minil.toml` を設定の正とし、
+`Build.PL` や `META.json` のような生成物は手で編集せず Minilla で更新してください。
+
+`META.json` は Git clone 後に `cpanm /path/to/cloned-repo` を成立させるため、
+生成物ですがリポジトリにも含めています。
