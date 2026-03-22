@@ -9,7 +9,7 @@ use lib "$FindBin::Bin/../lib";
 use HTTP::Tiny;
 use JSON::PP qw(encode_json decode_json);
 use Time::Piece;
-use Zengin::Client;
+use Zengin::Pl;
 
 my $SPREADSHEET_ID   = '1SAFslvoQiMtwMTRBXX_FzOlO6Bgtw7ebmNJBcyBY9rI';
 my $GOOGLE_SHEET_API = 'https://sheets.googleapis.com/v4/spreadsheets/';
@@ -26,7 +26,7 @@ my $access_token = access_token(
 );
 
 my $bearer = "Bearer $access_token";
-my $client = Zengin::Client->new();
+my $client = Zengin::Pl->new();
 
 my $banks    = bank_rows($client);
 my $branches = branch_rows($client);

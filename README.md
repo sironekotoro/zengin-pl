@@ -1,157 +1,98 @@
-# Zengin::Client
+# Zengin::Pl
 
-**Zengin::Client** は、全銀コード（金融機関コード・支店コード）データを
+`Zengin::Pl` は、全銀コード（金融機関コード・支店コード）データを
 GitHub 上の JSON リポジトリから取得する軽量 Perl クライアントです。
 
-> Lightweight Perl client for Zengin Code data.
+このリポジトリの正式な配布単位は、Git clone したリポジトリ直下です。
+モジュール名は `Zengin::Pl`、ディストリビューション名は `Zengin-Pl` です。
+`Zengin::Client` は後方互換のために残しています。
 
----
+## Installation
 
-## 📦 インストール
-
-GitHub リポジトリから直接インストールできます：
+### `cpanm` でローカル clone をインストール
 
 ```bash
-cpanm https://github.com/sironekotoro/zengin-pl.git
+git clone https://github.com/sironekotoro/zengin-pl.git
+cd zengin-pl
+cpanm .
 ```
 
----
+`cpanm /path/to/zengin-pl` のように、clone 済みディレクトリを直接指定しても
+インストールできます。
 
-## 🚀 使い方
+### 標準的な `Build.PL` 手順
+
+```bash
+git clone https://github.com/sironekotoro/zengin-pl.git
+cd zengin-pl
+perl Build.PL
+./Build
+./Build test
+./Build install
+```
+
+## Usage
 
 ```perl
-use Zengin::Client;
+use Zengin::Pl;
 
-my $client = Zengin::Client->new();
+my $client = Zengin::Pl->new();
 
-# 銀行名で検索
 my $banks = $client->search('みずほ');
 printf "%s: %s\n", $_->{code}, $_->{name} for @$banks;
 
-# 銀行名 + 支店名で検索
 my $branches = $client->search('みずほ', '東京');
 printf "%s: %s\n", $_->{code}, $_->{name} for @$branches;
 ```
 
----
+## API
 
-## 🔎 検索
-
-### `search($bank)`
-
-銀行名・カナ・ひらがな・コードを対象に検索し、銀行情報の配列リファレンスを返します。
+### `new(%args)`
 
 ```perl
-my $banks = $client->search('みずほ');
-
-for my $bank (@$banks) {
-    printf "%s: %s\n", $bank->{code}, $bank->{name};
-}
-```
-
-### `search($bank, $branch)`
-
-まず銀行を絞り込み、その銀行配下の支店名・カナ・ひらがな・コードを検索して、支店情報の配列リファレンスを返します。
-
-```perl
-my $branches = $client->search('みずほ', '東京');
-
-for my $branch (@$branches) {
-    printf "%s: %s\n", $branch->{code}, $branch->{name};
-}
-```
-
----
-
-## 📚 API
-
-### `get_all_banks`
-
-全銀行情報をハッシュリファレンスで取得します。キーは銀行コード、値は銀行情報です。
-
-```perl
-my $banks = $client->get_all_banks();
-printf "%s: %s\n", $_, $banks->{$_}->{name} for sort keys %$banks;
-```
-
-### `get_branches($bank_code)`
-
-指定した銀行コードの支店情報をハッシュリファレンスで取得します。キーは支店コード、値は支店情報です。
-
-```perl
-my $branches = $client->get_branches('0001');
-printf "%s: %s\n", $_, $branches->{$_}->{name} for sort keys %$branches;
-```
-
-### `get_bank($code)`
-
-指定した銀行コードの銀行情報を取得します。
-
-```perl
-my $bank = $client->get_bank('0001');
-printf "%s: %s\n", $bank->{code}, $bank->{name};
-```
-
-### `get_branch($bank_code, $branch_code)`
-
-指定した銀行コード・支店コードの支店情報を取得します。
-
-```perl
-my $branch = $client->get_branch('0001', '001');
-printf "%s: %s\n", $branch->{code}, $branch->{name};
-```
-
----
-
-## 🧰 オプション
-
-```perl
-my $client = Zengin::Client->new(
+my $client = Zengin::Pl->new(
     base_url => 'https://example.com/zengin-data'
 );
 ```
 
-`base_url` はデフォルトで
-[`https://raw.githubusercontent.com/sironekotoro/zengin-data-mirror/main/data`](https://github.com/sironekotoro/zengin-data-mirror)  
-を参照します。
+`base_url` のデフォルト値は
+[`https://raw.githubusercontent.com/sironekotoro/zengin-data-mirror/main/data`](https://github.com/sironekotoro/zengin-data-mirror)
+です。
 
----
+### `get_all_banks`
 
-## 🧪 テスト
+全銀行情報をハッシュリファレンスで返します。
+
+### `get_branches($bank_code)`
+
+指定した銀行コードの支店情報をハッシュリファレンスで返します。
+
+### `get_bank($code)`
+
+指定した銀行コードの銀行情報を返します。
+
+### `get_branch($bank_code, $branch_code)`
+
+指定した銀行コード・支店コードの支店情報を返します。
+
+### `search($bank_pattern)`
+
+銀行名・カナ・ひらがな・コードで銀行を検索し、配列リファレンスを返します。
+
+### `search($bank_pattern, $branch_pattern)`
+
+銀行を絞り込んだ上で支店名・カナ・ひらがな・コードを検索し、配列リファレンスを返します。
+
+## Test
 
 ```bash
 prove -lr t
 ```
 
----
-
-## 🔄 Google Sheets Sync
-
-GitHub Actions から毎日日本時間 9:00 に `zengin-data-mirror` の更新を確認し、変更があれば Google Sheets を更新します。
-
-- 対象シート: `銀行`, `支店`, `解説`
-- 更新判定: `zengin-data-mirror/data/updated_at`
-- 解説シート:
-  - `データ更新日: <mirror updated_at>`
-  - `反映日時: <workflow 実行日時>`
-
-### 注意事項
-
-- Google Sheets 連携は `author/update_google_sheet_from_mirror.pl` と GitHub Actions で実行します
-- GitHub Actions には `SIRONEKOTORO_CLIENT_ID` `SIRONEKOTORO_CLIENT_SECRET` `SIRONEKOTORO_REFRESH_TOKEN` の repository secrets が必要です
-- 同期状態は `.github/state/last_synced_updated_at` で管理します
-
----
-
-## 🪪 ライセンス
+## License
 
 MIT License
-© 2026 sironekotoro
 
----
+## Compatibility
 
-## 🧑‍💻 作者
-
-[@sironekotoro](https://github.com/sironekotoro)
-
-本プロジェクトは ChatGPT (OpenAI GPT-5) の協力のもと開発・整備されています。
+既存コード向けに `Zengin::Client` も引き続き利用できますが、新規利用では `Zengin::Pl` を使ってください。

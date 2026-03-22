@@ -2,15 +2,16 @@ use strict;
 use warnings;
 use utf8;
 use Test::More;
-use Zengin::Client;
+use lib 't/lib';
+use Zengin::TestHelper qw(live_client_or_skip);
 
-# 実行前に、標準出力がUTF-8になるように
 binmode Test::More->builder->output,         ':encoding(UTF-8)';
 binmode Test::More->builder->failure_output, ':encoding(UTF-8)';
 binmode Test::More->builder->todo_output,    ':encoding(UTF-8)';
 
-my $client = Zengin::Client->new( base_url =>
-      'https://raw.githubusercontent.com/zengin-code/source-data/master/data' );
+my $client = live_client_or_skip(
+    base_url => 'https://raw.githubusercontent.com/zengin-code/source-data/master/data'
+);
 
 subtest 'get_all_banks' => sub {
     my $banks = $client->get_all_banks();

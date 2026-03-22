@@ -1,6 +1,7 @@
-Revision history for Perl extension Zengin-Client
+Revision history for Perl extension Zengin-Pl
 
 {{$NEXT}}
 
-    - original version
-
+    - Rename the canonical module to Zengin::Pl
+    - Keep Zengin::Client as a backward-compatible wrapper
+    - Flatten repository layout so the distribution root matches the Git clone root
