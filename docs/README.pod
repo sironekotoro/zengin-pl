@@ -57,6 +57,30 @@ C<base_url> のデフォルト値は
 L<https://raw.githubusercontent.com/sironekotoro/zengin-data-mirror/main/data>
 です。
 
+=head1 META
+
+C<meta()> は backend 自身の情報をハッシュリファレンスで返します。
+zengin-pl-api のような呼び出し側が backend 情報を推測せず、そのまま取り込めることを意図しています。
+
+    my $meta = $client->meta();
+
+返り値例:
+
+    {
+      class    => 'Zengin::Pl',
+      version  => '0.01',
+      base_url => 'https://raw.githubusercontent.com/sironekotoro/zengin-data-mirror/main/data',
+      source   => {
+        kind       => 'zengin-data-mirror',
+        revision   => undef,
+        updated_at => undef,
+      },
+    }
+
+C<base_url> は現在実際に使っている値を返します。
+C<source.revision> と C<source.updated_at> は将来拡張用の枠として持っていますが、
+現時点では未実装のため C<undef> を返します。
+
 =head1 METHODS
 
 =head2 new(%args)
@@ -86,6 +110,12 @@ L<https://raw.githubusercontent.com/sironekotoro/zengin-data-mirror/main/data>
 =head2 search($bank_pattern, $branch_pattern)
 
 銀行を絞り込んだ上で支店名・カナ・ひらがな・コードを検索し、配列リファレンスを返します。
+
+=head2 meta()
+
+backend 自身のメタ情報をハッシュリファレンスで返します。
+現在は C<class>、C<version>、C<base_url> と、
+将来拡張用の C<source.kind>、C<source.revision>、C<source.updated_at> を返します。
 
 =head1 TEST
 

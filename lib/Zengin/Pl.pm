@@ -6,13 +6,28 @@ use HTTP::Tiny;
 use JSON::XS;
 
 our $VERSION = "0.01";
+our $DEFAULT_BASE_URL
+  = 'https://raw.githubusercontent.com/sironekotoro/zengin-data-mirror/main/data';
 
 sub new {
     my ( $class, %args ) = @_;
-    my $base = $args{base_url}
-      || 'https://raw.githubusercontent.com/sironekotoro/zengin-data-mirror/main/data';
+    my $base = $args{base_url} || $DEFAULT_BASE_URL;
     $base =~ s{/$}{};
     return bless { base_url => $base }, $class;
+}
+
+sub meta {
+    my ($self) = @_;
+    return {
+        class    => __PACKAGE__,
+        version  => $VERSION,
+        base_url => $self->{base_url},
+        source   => {
+            kind       => 'zengin-data-mirror',
+            revision   => undef,
+            updated_at => undef,
+        },
+    };
 }
 
 sub get_all_banks {
@@ -135,6 +150,12 @@ Zengin::Pl は、全銀協コードの JSON データを Perl から取得・検
 =head2 search($bank_pattern, [$branch_pattern])
 
 部分一致または正規表現で銀行名／支店名を検索します。
+
+=head2 meta()
+
+backend 自身のメタ情報をハッシュリファレンスで返します。
+現在は C<class>、C<version>、C<base_url> と、
+将来拡張用の C<source.kind>、C<source.revision>、C<source.updated_at> を返します。
 
 =head1 LICENSE
 
