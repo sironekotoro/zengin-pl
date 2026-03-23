@@ -1,4 +1,6 @@
 name = "Zengin-Pl"
 badges = ["github-actions/test.yml"]
+license = "mit"
 module_maker = "ModuleBuildTiny"
+readme_from = "docs/README.pod"
 static_install = "auto"

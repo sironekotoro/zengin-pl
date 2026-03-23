@@ -1,5 +1,5 @@
 {
-   "abstract" : "Lightweight Perl client for Zengin Code JSON data",
+   "abstract" : "Lightweight Perl client for Zengin Code (全銀協コード) JSON dataset",
    "author" : [
       "sironekotoro <8675420+sironekotoro@users.noreply.github.com>"
    ],
@@ -31,6 +31,15 @@
             "Module::Build::Tiny" : "0.035"
          }
       },
+      "develop" : {
+         "requires" : {
+            "Test::CPAN::Meta" : "0",
+            "Test::MinimumVersion::Fast" : "0.04",
+            "Test::PAUSE::Permissions" : "0.07",
+            "Test::Pod" : "1.41",
+            "Test::Spellunker" : "v0.2.7"
+         }
+      },
       "runtime" : {
          "requires" : {
             "IO::Socket::SSL" : "0",
@@ -45,8 +54,22 @@
          }
       }
    },
-   "release_status" : "stable",
+   "release_status" : "unstable",
+   "resources" : {
+      "bugtracker" : {
+         "web" : "https://github.com/sironekotoro/zengin-pl/issues"
+      },
+      "homepage" : "https://github.com/sironekotoro/zengin-pl",
+      "repository" : {
+         "type" : "git",
+         "url" : "https://github.com/sironekotoro/zengin-pl.git",
+         "web" : "https://github.com/sironekotoro/zengin-pl"
+      }
+   },
    "version" : "0.01",
+   "x_contributors" : [
+      "github-actions[bot] <github-actions[bot]@users.noreply.github.com>"
+   ],
    "x_serialization_backend" : "JSON::PP version 4.16",
    "x_static_install" : 1
 }
