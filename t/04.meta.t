@@ -1,10 +1,15 @@
 use strict;
 use warnings;
 use utf8;
+use open qw(:std :encoding(UTF-8));
 use Test::More;
 
 use Zengin::Pl;
 use Zengin::Client;
+
+binmode Test::More->builder->output,         ':encoding(UTF-8)';
+binmode Test::More->builder->failure_output, ':encoding(UTF-8)';
+binmode Test::More->builder->todo_output,    ':encoding(UTF-8)';
 
 subtest 'Zengin::Pl meta returns backend information' => sub {
     my $client = Zengin::Pl->new();
