@@ -8,12 +8,28 @@ use JSON::XS;
 our $VERSION = "0.01";
 our $DEFAULT_BASE_URL
   = 'https://raw.githubusercontent.com/sironekotoro/zengin-data-mirror/main/data';
+our $DEFAULT_CACHE_TTL = 21600;
 
 sub new {
     my ( $class, %args ) = @_;
     my $base = $args{base_url} || $DEFAULT_BASE_URL;
     $base =~ s{/$}{};
-    return bless { base_url => $base }, $class;
+    return bless {
+        base_url       => $base,
+        cache_ttl      => defined $args{cache_ttl} ? $args{cache_ttl} : $DEFAULT_CACHE_TTL,
+        now_provider   => $args{now_provider} || sub { time },
+        http_client    => $args{http_client} || HTTP::Tiny->new,
+        branches_cache => {},
+    }, $class;
+}
+
+sub _cached_value {
+    my ( $self, $cache ) = @_;
+    return unless $self->{cache_ttl} > 0 && $cache;
+
+    my $now = $self->{now_provider}->();
+    return if $now - $cache->{fetched_at} >= $self->{cache_ttl};
+    return ( 1, $cache->{value} );
 }
 
 sub meta {
@@ -32,20 +48,37 @@ sub meta {
 
 sub get_all_banks {
     my ($self) = @_;
+    my ( $cached, $value ) = $self->_cached_value( $self->{banks_cache} );
+    return $value if $cached;
+
     my $url    = "$self->{base_url}/banks.json";
-    my $res    = HTTP::Tiny->new->get($url);
+    my $res    = $self->{http_client}->get($url);
     die "Failed to fetch banks: $res->{status} $res->{reason}"
       unless $res->{success};
-    return decode_json( $res->{content} );
+    my $banks = decode_json( $res->{content} );
+    $self->{banks_cache} = {
+        value      => $banks,
+        fetched_at => $self->{now_provider}->(),
+    } if $self->{cache_ttl} > 0;
+    return $banks;
 }
 
 sub get_branches {
     my ( $self, $bank_code ) = @_;
+    my ( $cached, $value ) =
+      $self->_cached_value( $self->{branches_cache}{$bank_code} );
+    return $value if $cached;
+
     my $url = sprintf( "%s/branches/%s.json", $self->{base_url}, $bank_code );
-    my $res = HTTP::Tiny->new->get($url);
+    my $res = $self->{http_client}->get($url);
     die "Failed to fetch branches for $bank_code: $res->{status} $res->{reason}"
       unless $res->{success};
-    return decode_json( $res->{content} );
+    my $branches = decode_json( $res->{content} );
+    $self->{branches_cache}{$bank_code} = {
+        value      => $branches,
+        fetched_at => $self->{now_provider}->(),
+    } if $self->{cache_ttl} > 0;
+    return $branches;
 }
 
 sub get_bank {
