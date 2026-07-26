@@ -20,6 +20,7 @@ sub new {
         now_provider   => $args{now_provider} || sub { time },
         http_client    => $args{http_client} || HTTP::Tiny->new,
         branches_cache => {},
+        metadata_cache => {},
     }, $class;
 }
 
@@ -34,16 +35,40 @@ sub _cached_value {
 
 sub meta {
     my ($self) = @_;
+    my $updated_at = $self->_metadata_value('updated_at');
+    my $revision   = $self->_metadata_value('revision');
     return {
         class    => __PACKAGE__,
         version  => $VERSION,
         base_url => $self->{base_url},
         source   => {
             kind       => 'zengin-data-mirror',
-            revision   => undef,
-            updated_at => undef,
+            revision   => $revision,
+            updated_at => $updated_at,
         },
     };
+}
+
+sub _metadata_value {
+    my ( $self, $name ) = @_;
+    my ( $cached, $value ) =
+      $self->_cached_value( $self->{metadata_cache}{$name} );
+    return $value if $cached;
+
+    my $res = eval { $self->{http_client}->get("$self->{base_url}/$name") };
+    return unless $res && $res->{success} && defined $res->{content};
+
+    $value = $res->{content};
+    $value =~ s/\s+\z//;
+    return unless length $value;
+    return if $name eq 'revision' && $value !~ /\A[0-9a-f]{40}\z/i;
+    $value = lc $value if $name eq 'revision';
+
+    $self->{metadata_cache}{$name} = {
+        value      => $value,
+        fetched_at => $self->{now_provider}->(),
+    } if $self->{cache_ttl} > 0;
+    return $value;
 }
 
 sub get_all_banks {
@@ -187,8 +212,8 @@ Zengin::Pl は、全銀協コードの JSON データを Perl から取得・検
 =head2 meta()
 
 backend 自身のメタ情報をハッシュリファレンスで返します。
-現在は C<class>、C<version>、C<base_url> と、
-将来拡張用の C<source.kind>、C<source.revision>、C<source.updated_at> を返します。
+C<class>、C<version>、C<base_url> と、
+C<source.kind>、C<source.revision>、C<source.updated_at> を返します。
 
 =head1 LICENSE
 
