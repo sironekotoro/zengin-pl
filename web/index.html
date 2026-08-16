@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>全銀協コード検索 - Bank Code Search</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <header>
+        <h1>全銀協コード検索</h1>
+        <p>銀行コード・支店コードをカンタン検索</p>
+    </header>
+
+    <main>
+        <section class="search-section">
+            <div class="bank-search">
+                <label for="bank-input">銀行名または銀行コード</label>
+                <div class="input-group">
+                    <input type="text" id="bank-input" placeholder="例: みずほ または 0001" autocomplete="off">
+                    <button type="button" id="bank-search-btn">検索</button>
+                </div>
+            </div>
+
+            <div id="bank-results" class="results hidden"></div>
+
+            <div id="selected-bank" class="selected-bank hidden">
+                <span class="label">選択中:</span>
+                <span id="selected-bank-name"></span>
+                <button type="button" id="clear-bank" class="clear-btn">× 解除</button>
+            </div>
+
+            <div id="branch-search-section" class="branch-search hidden">
+                <label for="branch-input">支店名または支店コード</label>
+                <div class="input-group">
+                    <input type="text" id="branch-input" placeholder="例: 東京 または 001" autocomplete="off">
+                    <button type="button" id="branch-search-btn">検索</button>
+                </div>
+            </div>
+
+            <div id="branch-results" class="results hidden"></div>
+        </section>
+
+        <section id="error-message" class="error hidden"></section>
+        <section id="loading" class="loading hidden">読み込み中...</section>
+    </main>
+
+    <footer>
+        <p>データは <a href="https://github.com/sironekotoro/zengin-data-mirror" target="_blank" rel="noopener">zengin-data-mirror</a> より</p>
+    </footer>
+
+    <script src="app.js"></script>
+</body>
+</html>
