@@ -1,0 +1,76 @@
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - 'web/**'
+      - 'tools/generate_web_data.pl'
+      - 'lib/**'
+      - 't/**'
+      - '!.github/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Perl
+        uses: shogo82148/actions-setup-perl@v2
+        with:
+          perl-version: '5.40'
+
+      - name: Install dependencies
+        run: |
+          cpanm --install-file-opts --notest Module::Build::Tiny HTTP::Tiny JSON::XS
+
+      - name: Generate web data
+        run: |
+          perl tools/generate_web_data.pl
+
+      - name: Run tests
+        run: |
+          prove -lr t
+
+      - name: Verify web data
+        run: |
+          echo "Checking banks.json..."
+          BANK_COUNT=$(jq '. | length' web/data/banks.json)
+          echo "Bank count: $BANK_COUNT"
+          
+          echo "Checking branches..."
+          BRANCH_COUNT=$(ls -1 web/data/branches/ | wc -l)
+          echo "Branch files: $BRANCH_COUNT"
+          
+          echo "Verifying JSON syntax..."
+          jq empty web/data/banks.json
+          jq empty web/data/meta.json
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: 'web'
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
