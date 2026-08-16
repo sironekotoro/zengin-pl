@@ -29,13 +29,15 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Setup Perl
-        uses: shogo82148/actions-setup-perl@v2
+        uses: shogo82148/actions-setup-perl@v1
         with:
           perl-version: '5.40'
 
+      - name: Install cpanm
+        run: curl -L https://cpanmin.us | perl - App::cpanminus
+
       - name: Install dependencies
-        run: |
-          cpanm --install-file-opts --notest Module::Build::Tiny HTTP::Tiny JSON::XS
+        run: cpanm -nq --installdeps .
 
       - name: Generate web data
         run: |
