@@ -40,3 +40,5 @@ MYMETA.*
 tempCodeRunnerFile*
 test.pl
 tools/update_sheet.pl
+
+/web/data/
