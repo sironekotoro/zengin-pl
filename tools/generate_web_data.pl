@@ -21,7 +21,7 @@ sub fetch_json {
 sub write_file {
     my ($path, $content) = @_;
     make_path(dirname($path));
-    open my $fh, '>:encoding(UTF-8)', $path or die "Cannot open $path: $!";
+    open my $fh, '>:raw', $path or die "Cannot open $path: $!";
     print $fh $content;
     close $fh;
 }

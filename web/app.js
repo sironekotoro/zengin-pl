@@ -45,45 +45,9 @@
         elements.loading.classList.add('hidden');
     }
 
-    function matches(row, pattern) {
-        if (!pattern) return false;
-        const rx = new RegExp(escapeRegExp(pattern), 'i');
-
-        if (row.name && rx.test(row.name)) return true;
-        if (row.kana && rx.test(row.kana)) return true;
-        if (row.hira && rx.test(row.hira)) return true;
-        if (row.code && rx.test(row.code)) return true;
-        return false;
-    }
-
-    function escapeRegExp(string) {
-        return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    }
-
-    function sortBanks(banks) {
-        return banks.sort((a, b) => a.code.localeCompare(b.code, 'en'));
-    }
-
+    // 検索は web/search.js の ZenginSearch に集約
     function searchBanks(pattern) {
-        if (!banksData) return [];
-
-        const results = [];
-
-        if (/^\d+$/.test(pattern)) {
-            const exact = banksData[pattern];
-            if (exact) {
-                results.push(exact);
-            }
-        } else {
-            for (const code in banksData) {
-                const bank = banksData[code];
-                if (matches(bank, pattern)) {
-                    results.push(bank);
-                }
-            }
-        }
-
-        return sortBanks(results);
+        return ZenginSearch.searchBanks(banksData, pattern);
     }
 
     async function loadBanks() {
@@ -124,26 +88,7 @@
     }
 
     function searchBranches(pattern, bankCode) {
-        const branches = branchesCache[bankCode];
-        if (!branches) return [];
-
-        const results = [];
-
-        if (/^\d+$/.test(pattern)) {
-            const exact = branches[pattern];
-            if (exact) {
-                results.push(exact);
-            }
-        } else {
-            for (const code in branches) {
-                const branch = branches[code];
-                if (matches(branch, pattern)) {
-                    results.push(branch);
-                }
-            }
-        }
-
-        return results.sort((a, b) => a.code.localeCompare(b.code, 'en'));
+        return ZenginSearch.searchBranches(branchesCache[bankCode], pattern);
     }
 
     function renderBankResults(banks) {
