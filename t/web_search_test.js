@@ -107,6 +107,24 @@ check('存在しない銀行は 0 件',
     check('存在しない支店は 0 件', notFound.length === 0, JSON.stringify(codes(notFound)));
 }
 
+// --- コピーボタン ---
+{
+    var html = ZenginSearch.copyButtonHTML('0001', '銀行コード');
+    check('copyButtonHTML は button を含む', html.indexOf('<button') !== -1, 'no button tag');
+    check('copyButtonHTML は copy-btn class', html.indexOf('copy-btn') !== -1, 'no copy-btn class');
+    check('copyButtonHTML は data-copy', html.indexOf('data-copy="0001"') !== -1, 'missing data-copy');
+    check('copyButtonHTML は data-label', html.indexOf('data-label="') !== -1, 'missing data-label');
+    check('copyButtonHTML は aria-label', html.indexOf('aria-label="') !== -1, 'missing aria-label');
+    check('copyButtonHTML は SVG を含む', html.indexOf('<svg') !== -1, 'no svg');
+    check('copyButtonHTML は閉じタグ', html.indexOf('</button>') !== -1, 'no closing tag');
+    check('copyButtonHTML は type="button"', html.indexOf('type="button"') !== -1, 'missing type');
+    check('copyButtonHTML は値をエスケープ', ZenginSearch.copyButtonHTML('<script>', 'test').indexOf('&lt;script&gt;') !== -1, 'unescaped value');
+    check('copyButtonHTML はラベルをエスケープ', ZenginSearch.copyButtonHTML('x', '<b>bold</b>').indexOf('&lt;b&gt;bold&lt;/b&gt;') !== -1, 'unescaped label');
+    check('escapeHtml は存在する', typeof ZenginSearch.escapeHtml === 'function', 'escapeHtml not exported');
+    check('escapeHtml は & をエスケープ', ZenginSearch.escapeHtml('a&b') === 'a&amp;b', 'amp not escaped');
+    check('escapeHtml は < > をエスケープ', ZenginSearch.escapeHtml('<tag>') === '&lt;tag&gt;', 'angle brackets not escaped');
+}
+
 if (failures.length) {
     console.error('WEB SEARCH FAILURES:');
     for (const failure of failures) {
