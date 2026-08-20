@@ -12,6 +12,7 @@
         bankSearchBtn: document.getElementById('bank-search-btn'),
         bankResults: document.getElementById('bank-results'),
         selectedBankSection: document.getElementById('selected-bank'),
+        selectedBankCode: document.getElementById('selected-bank-code'),
         selectedBankName: document.getElementById('selected-bank-name'),
         clearBankBtn: document.getElementById('clear-bank'),
         branchSearchSection: document.getElementById('branch-search-section'),
@@ -23,9 +24,50 @@
     };
 
     function escapeHtml(text) {
-        const div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
+        return ZenginSearch.escapeHtml(text);
+    }
+
+    function copyButtonHTML(value, label) {
+        return ZenginSearch.copyButtonHTML(value, label);
+    }
+
+    async function copyToClipboard(text, btn, label) {
+        try {
+            await navigator.clipboard.writeText(text);
+        } catch {
+            const ta = document.createElement('textarea');
+            ta.value = text;
+            ta.style.position = 'fixed';
+            ta.style.opacity = '0';
+            document.body.appendChild(ta);
+            ta.select();
+            document.execCommand('copy');
+            document.body.removeChild(ta);
+        }
+        btn.classList.add('copied');
+        btn.setAttribute('aria-label', 'コピーしました');
+        setTimeout(function () {
+            btn.classList.remove('copied');
+            btn.setAttribute('aria-label', escapeHtml(label) + 'をコピー');
+        }, 1500);
+    }
+
+    function initCopyButtons(container) {
+        container.querySelectorAll('.copy-btn').forEach(function (btn) {
+            btn.addEventListener('click', function (e) {
+                e.stopPropagation();
+                var value = btn.dataset.copy;
+                var label = btn.getAttribute('title') || '';
+                copyToClipboard(value, btn, label);
+            });
+            btn.addEventListener('keydown', function (e) {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    btn.click();
+                }
+            });
+        });
     }
 
     function showError(message) {
@@ -110,13 +152,16 @@
         elements.bankResults.innerHTML = banks.map(bank => `
             <div class="result-item" tabindex="0" data-code="${escapeHtml(bank.code)}">
                 <span class="result-code">${escapeHtml(bank.code)}</span>
+                ${copyButtonHTML(bank.code, '銀行コード')}
                 <span class="result-name">${escapeHtml(bank.name)}</span>
+                ${copyButtonHTML(bank.name, '銀行名')}
                 <div class="result-kana">${escapeHtml(bank.hira || bank.kana || '')}</div>
                 ${bank.roma ? `<div class="result-roma">${escapeHtml(bank.roma)}</div>` : ''}
             </div>
         `).join('');
 
         elements.bankResults.classList.remove('hidden');
+        initCopyButtons(elements.bankResults);
 
         elements.bankResults.querySelectorAll('.result-item').forEach(item => {
             item.addEventListener('click', () => {
@@ -139,11 +184,13 @@
         selectedBank = bank;
         elements.bankInput.value = '';
         elements.bankResults.classList.add('hidden');
-        elements.selectedBankName.textContent = `${bank.code} ${bank.name}`;
+        elements.selectedBankCode.innerHTML = escapeHtml(bank.code) + copyButtonHTML(bank.code, '銀行コード');
+        elements.selectedBankName.innerHTML = escapeHtml(bank.name) + copyButtonHTML(bank.name, '銀行名');
         elements.selectedBankSection.classList.remove('hidden');
         elements.branchSearchSection.classList.remove('hidden');
         elements.branchInput.focus();
         hideError();
+        initCopyButtons(elements.selectedBankSection);
     }
 
     function clearSelectedBank() {
@@ -170,7 +217,9 @@
         elements.branchResults.innerHTML = branches.map(branch => `
             <div class="result-item" tabindex="0">
                 <span class="result-code">${escapeHtml(bankCode)}-${escapeHtml(branch.code)}</span>
+                ${copyButtonHTML(branch.code, '支店コード')}
                 <span class="result-name">${escapeHtml(branch.name)}</span>
+                ${copyButtonHTML(branch.name, '支店名')}
                 <div class="result-kana">${escapeHtml(branch.hira || branch.kana || '')}</div>
                 ${branch.roma ? `<div class="result-roma">${escapeHtml(branch.roma)}</div>` : ''}
                 <div class="result-kana" style="margin-top: 0.25rem; font-size: 0.8rem;">(${escapeHtml(bankName)})</div>
@@ -178,6 +227,7 @@
         `).join('');
 
         elements.branchResults.classList.remove('hidden');
+        initCopyButtons(elements.branchResults);
     }
 
     async function handleBankSearch() {

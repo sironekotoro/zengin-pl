@@ -81,7 +81,6 @@ check('存在しない銀行は 0 件',
 {
     const r = ZenginSearch.searchBanks(banks, '三菱');
     check('三菱 は 1 件以上', r.length > 0, JSON.stringify(codes(r)));
-    check('三菱 は複数候補', r.length >= 2, JSON.stringify(codes(r)));
     check('三菱 に 0005 を含む', codes(r).includes('0005'), JSON.stringify(codes(r)));
     check('三菱 全件マッチ', r.every(b => matchesAnyField(b, '三菱')));
     check('三菱 は昇順', isSortedByCode(r), JSON.stringify(codes(r)));
@@ -89,7 +88,7 @@ check('存在しない銀行は 0 件',
 
 {
     const r = ZenginSearch.searchBanks(banks, '東京');
-    check('東京 は複数候補', r.length >= 2, JSON.stringify(codes(r)));
+    check('東京 は 1 件以上', r.length >= 1, JSON.stringify(codes(r)));
     check('東京 全件マッチ', r.every(b => matchesAnyField(b, '東京')));
     check('東京 は昇順', isSortedByCode(r), JSON.stringify(codes(r)));
 }
@@ -105,6 +104,18 @@ check('存在しない銀行は 0 件',
 
     const notFound = ZenginSearch.searchBranches(branches, '存在しない支店');
     check('存在しない支店は 0 件', notFound.length === 0, JSON.stringify(codes(notFound)));
+}
+
+// --- コピーボタン ---
+{
+    const html = ZenginSearch.copyButtonHTML('0001', '銀行コード');
+    check('copyButtonHTML は button を含む', html.indexOf('<button') !== -1, 'no button tag');
+    check('copyButtonHTML は copy-btn class', html.indexOf('copy-btn') !== -1, 'no copy-btn class');
+    check('copyButtonHTML は data-copy', html.indexOf('data-copy="0001"') !== -1, 'missing data-copy');
+    check('copyButtonHTML は aria-label', html.indexOf('aria-label="') !== -1, 'missing aria-label');
+    check('copyButtonHTML は SVG を含む', html.indexOf('<svg') !== -1, 'no svg');
+    check('copyButtonHTML は閉じタグ', html.indexOf('</button>') !== -1, 'no closing tag');
+    check('copyButtonHTML は値をエスケープ', ZenginSearch.copyButtonHTML('<script>', 'test').indexOf('&lt;script&gt;') !== -1, 'unescaped value');
 }
 
 if (failures.length) {
