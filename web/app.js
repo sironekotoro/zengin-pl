@@ -252,6 +252,7 @@
                     <span class="result-actions">${copyButtonHTML(bank.name, '銀行名')}</span>
                 </div>
                 ${kanaRowHtml(bank)}
+                ${bank.roma ? `<div class="result-roma">${escapeHtml(bank.roma)}</div>` : ''}
                 ${oldNamesHtml(bank.code)}
             </div>
         `).join('');
@@ -345,6 +346,7 @@
                     <span class="result-actions">${copyButtonHTML(branch.name, '支店名')}</span>
                 </div>
                 ${kanaRowHtml(branch)}
+                ${branch.roma ? `<div class="result-roma">${escapeHtml(branch.roma)}</div>` : ''}
                 <div class="result-bankname">（${escapeHtml(bankName)}）</div>
             </div>
         `).join('');
