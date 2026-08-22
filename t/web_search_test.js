@@ -125,6 +125,44 @@ check('存在しない銀行は 0 件',
     check('escapeHtml は < > をエスケープ', ZenginSearch.escapeHtml('<tag>') === '&lt;tag&gt;', 'angle brackets not escaped');
 }
 
+// --- 補助名称（旧銀行名）検索: options.altNames（Web 独自拡張） ---
+{
+    const altNames = { '0001': ['第一国立銀行'], '0005': ['三菱銀行', '三菱UFJ銀行'] };
+
+    const byOld = ZenginSearch.searchBanks(banks, '第一国立', { altNames });
+    check('旧名称で 0001 がヒットする', codes(byOld).includes('0001'), JSON.stringify(codes(byOld)));
+    check('旧名称検索でも全件マッチは保証されない（補助名称ヒットを許容）',
+        byOld.every(b => matchesAnyField(b, '第一国立') || b.code === '0001'));
+
+    const noAlt = ZenginSearch.searchBanks(banks, '第一国立');
+    check('altNames 無しでは旧名称はヒットしない', noAlt.length === 0, JSON.stringify(codes(noAlt)));
+
+    const multiple = ZenginSearch.searchBanks(banks, '三菱UFJ', { altNames });
+    check('複数旧名称のどれかでヒットする', codes(multiple).includes('0005'), JSON.stringify(codes(multiple)));
+
+    // 数字のみ入力は完全一致 lookup のまま（altNames の影響を受けない）
+    const digits = ZenginSearch.searchBanks(banks, '0001', { altNames });
+    check('数字完全一致は altNames でも変わらない',
+        digits.length === 1 && digits[0].code === '0001', JSON.stringify(codes(digits)));
+}
+
+// --- limitResults（候補表示用の件数制限） ---
+{
+    const all = ZenginSearch.searchBanks(banks, '東京');
+    if (all.length >= 3) {
+        const limited = ZenginSearch.limitResults(all, 2);
+        check('limitResults は先頭 N 件に切り詰める', limited.items.length === 2,
+            String(limited.items.length));
+        check('limitResults は全体件数を保持する', limited.total === all.length,
+            `${limited.total} vs ${all.length}`);
+        check('limitResults は truncated を報告する', limited.truncated === true);
+        check('切り詰めは code 昇順の先頭から', isSortedByCode(limited.items));
+    }
+    const under = ZenginSearch.limitResults(all, 10000);
+    check('上限以内なら truncated=false', under.truncated === false && under.total === all.length);
+    check('max 未指定なら全件コピー', ZenginSearch.limitResults(all).items.length === all.length);
+}
+
 if (failures.length) {
     console.error('WEB SEARCH FAILURES:');
     for (const failure of failures) {

@@ -17,9 +17,12 @@
             <div class="bank-search">
                 <label for="bank-input">銀行名または銀行コード</label>
                 <div class="input-group">
-                    <input type="text" id="bank-input" placeholder="例: みずほ または 0001" autocomplete="off">
+                    <input type="text" id="bank-input" placeholder="例: みずほ または 0001" autocomplete="off"
+                           role="combobox" aria-autocomplete="list" aria-expanded="false"
+                           aria-controls="bank-suggestions">
                     <button type="button" id="bank-search-btn">検索</button>
                 </div>
+                <div id="bank-suggestions" class="suggestions hidden" role="listbox" aria-label="銀行検索候補"></div>
             </div>
 
             <div id="bank-results" class="results hidden"></div>
@@ -28,15 +31,19 @@
                 <span class="label">選択中:</span>
                 <span id="selected-bank-code" class="selected-code"></span>
                 <span id="selected-bank-name"></span>
+                <span id="selected-bank-old-names" class="old-names"></span>
                 <button type="button" id="clear-bank" class="clear-btn">× 解除</button>
             </div>
 
             <div id="branch-search-section" class="branch-search hidden">
                 <label for="branch-input">支店名または支店コード</label>
                 <div class="input-group">
-                    <input type="text" id="branch-input" placeholder="例: 東京 または 001" autocomplete="off">
+                    <input type="text" id="branch-input" placeholder="例: 東京 または 001" autocomplete="off"
+                           role="combobox" aria-autocomplete="list" aria-expanded="false"
+                           aria-controls="branch-suggestions">
                     <button type="button" id="branch-search-btn">検索</button>
                 </div>
+                <div id="branch-suggestions" class="suggestions hidden" role="listbox" aria-label="支店検索候補"></div>
             </div>
 
             <div id="branch-results" class="results hidden"></div>
@@ -51,6 +58,7 @@
     </footer>
 
     <script src="search.js"></script>
+    <script src="kana.js"></script>
     <script src="app.js"></script>
 </body>
 </html>
