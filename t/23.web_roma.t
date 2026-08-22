@@ -60,11 +60,15 @@ sub _run_node {
     my $out = `$cmd`;
     my $exit = $? >> 8;
 
-    # フラグ未対応・環境差異で失敗した場合は素の node で再試行
+    # フラグ未対応・環境差異で失敗した場合は素の node で再試行。
+    # 標準出力と終了コードは別々の変数に直後の $? から取り、明示的に返す
+    # （リスト代入にまとめると $? の評価タイミングが曖昧になるため）。
     if ( $exit != 0 ) {
         my $fallback_cmd = join ' ',
           ( map { "'" . $_ . "'" } ( $node, $script ) ), '2>&1';
-        ( $out, $exit ) = ( `$fallback_cmd`, $? >> 8 );
+        my $fallback_out   = `$fallback_cmd`;
+        my $fallback_exit  = $? >> 8;
+        return ( $fallback_out, $fallback_exit );
     }
     return ( $out, $exit );
 }
