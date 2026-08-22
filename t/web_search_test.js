@@ -113,7 +113,7 @@ check('存在しない銀行は 0 件',
     check('copyButtonHTML は button を含む', html.indexOf('<button') !== -1, 'no button tag');
     check('copyButtonHTML は copy-btn class', html.indexOf('copy-btn') !== -1, 'no copy-btn class');
     check('copyButtonHTML は data-copy', html.indexOf('data-copy="0001"') !== -1, 'missing data-copy');
-    check('copyButtonHTML は data-label', html.indexOf('data-label="') !== -1, 'missing data-label');
+    check('copyButtonHTML は data-label="銀行コード"', html.indexOf('data-label="銀行コード"') !== -1, 'missing or wrong data-label');
     check('copyButtonHTML は aria-label', html.indexOf('aria-label="') !== -1, 'missing aria-label');
     check('copyButtonHTML は SVG を含む', html.indexOf('<svg') !== -1, 'no svg');
     check('copyButtonHTML は閉じタグ', html.indexOf('</button>') !== -1, 'no closing tag');
@@ -123,6 +123,29 @@ check('存在しない銀行は 0 件',
     check('escapeHtml は存在する', typeof ZenginSearch.escapeHtml === 'function', 'escapeHtml not exported');
     check('escapeHtml は & をエスケープ', ZenginSearch.escapeHtml('a&b') === 'a&amp;b', 'amp not escaped');
     check('escapeHtml は < > をエスケープ', ZenginSearch.escapeHtml('<tag>') === '&lt;tag&gt;', 'angle brackets not escaped');
+}
+
+// --- コピーボタンの wired value/label/aria-label 検証 ---
+// 各コピー対象（銀行名、銀行コード、支店名、支店コード、半角カタカナ）が
+// 正しい data-copy / data-label / aria-label で生成されることを検証する
+{
+    var targets = [
+        { value: '0001', label: '銀行コード', desc: '銀行コード' },
+        { value: 'みずほ', label: '銀行名', desc: '銀行名' },
+        { value: '001', label: '支店コード', desc: '支店コード' },
+        { value: '東京支店', label: '支店名', desc: '支店名' },
+        { value: 'ﾐｽﾞﾎ', label: '半角カタカナ', desc: '半角カタカナ' },
+    ];
+
+    for (var i = 0; i < targets.length; i++) {
+        var t = targets[i];
+        var h = ZenginSearch.copyButtonHTML(t.value, t.label);
+        var escapedValue = ZenginSearch.escapeHtml(String(t.value));
+        var escapedLabel = ZenginSearch.escapeHtml(String(t.label));
+        check('copyButtonHTML(' + t.desc + ') の data-copy', h.indexOf('data-copy="' + escapedValue + '"') !== -1, 'data-copy value mismatch for ' + t.desc);
+        check('copyButtonHTML(' + t.desc + ') の data-label', h.indexOf('data-label="' + escapedLabel + '"') !== -1, 'data-label mismatch for ' + t.desc);
+        check('copyButtonHTML(' + t.desc + ') の aria-label', h.indexOf('aria-label="' + escapedLabel + '&#x3092;&#x30b3;&#x30d4;&#x30fc;"') !== -1, 'aria-label should be "' + escapedLabel + 'をコピー" for ' + t.desc);
+    }
 }
 
 // --- 補助名称（旧銀行名）検索: options.altNames（Web 独自拡張） ---
