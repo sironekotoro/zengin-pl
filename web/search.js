@@ -5,7 +5,7 @@
         return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     }
 
-    function matches(row, pattern) {
+    function matches(row, pattern, altNames) {
         if (!pattern) {
             return false;
         }
@@ -15,6 +15,15 @@
         if (row.kana && rx.test(row.kana)) return true;
         if (row.hira && rx.test(row.hira)) return true;
         if (row.code && rx.test(row.code)) return true;
+        // 旧銀行名などの補助名称（任意）。CLI 仕様には無い Web 独自の拡張。
+        if (altNames) {
+            const names = altNames[row.code];
+            if (names) {
+                for (const name of names) {
+                    if (name && rx.test(name)) return true;
+                }
+            }
+        }
         return false;
     }
 
@@ -26,7 +35,8 @@
 
     // CLI/Web 層の dispatch: 数字のみの入力は完全一致 lookup、
     // それ以外は name/kana/hira/code へのリテラル部分一致（roma は対象外）。
-    function searchBanks(banksData, pattern) {
+    // options.altNames: { [code]: [補助名称, ...] } — 旧銀行名検索用（任意）。
+    function searchBanks(banksData, pattern, options) {
         if (!banksData || !pattern) {
             return [];
         }
@@ -35,10 +45,11 @@
             return exact ? [exact] : [];
         }
 
+        const altNames = options && options.altNames;
         const results = [];
         for (const code in banksData) {
             const bank = banksData[code];
-            if (matches(bank, pattern)) {
+            if (matches(bank, pattern, altNames)) {
                 results.push(bank);
             }
         }
@@ -64,7 +75,7 @@
         return sortByCode(results);
     }
 
-    function escapeHtml(text) {
+function escapeHtml(text) {
         return String(text).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
     }
 
@@ -79,12 +90,22 @@
             '</svg></button>';
     }
 
+    // 候補表示用の件数制限。全件検索（Enter/ボタン）の挙動は変えない。
+    function limitResults(items, max) {
+        const total = items.length;
+        if (max == null || total <= max) {
+            return { items: items.slice(), total: total, truncated: false };
+        }
+        return { items: items.slice(0, max), total: total, truncated: true };
+    }
+
     const ZenginSearch = {
         matches: matches,
         searchBanks: searchBanks,
         searchBranches: searchBranches,
         escapeHtml: escapeHtml,
-        copyButtonHTML: copyButtonHTML
+        copyButtonHTML: copyButtonHTML,
+        limitResults: limitResults
     };
 
     if (typeof module !== 'undefined' && module.exports) {

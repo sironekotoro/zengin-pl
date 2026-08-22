@@ -179,11 +179,156 @@ button:focus {
     padding: 0.25rem 0.5rem;
     font-size: 0.85rem;
     background: #e74c3c;
-    margin-left: auto;
+    margin-left: 0.25rem;
 }
 
 .clear-btn:hover {
     background: #c0392b;
+}
+
+/* 銀行コード / 支店コードの分離表示 */
+.code-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    background: #eef2f5;
+    border: 1px solid #d7dee4;
+    border-radius: 4px;
+    padding: 0.05rem 0.35rem;
+    font-variant-numeric: tabular-nums;
+}
+
+.code-chip .code-label {
+    font-size: 0.65rem;
+    font-weight: 600;
+    color: #fff;
+    background: #2c3e50;
+    border-radius: 3px;
+    padding: 0 0.3rem;
+    line-height: 1.4;
+}
+
+.code-chip:last-of-type .code-label {
+    background: #3498db;
+}
+
+.code-value {
+    font-weight: 700;
+    color: #2c3e50;
+}
+
+.result-main-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.result-actions {
+    margin-left: auto;
+    display: inline-flex;
+    gap: 0.25rem;
+}
+
+.result-bankname {
+    font-size: 0.8rem;
+    color: #777;
+    margin-top: 0.25rem;
+}
+
+.old-names {
+    font-size: 0.78rem;
+    color: #8a6d3b;
+    margin-top: 0.25rem;
+}
+
+.sug-old {
+    color: #8a6d3b;
+    font-weight: 400;
+}
+
+/* インクリメンタル検索の候補リスト */
+.bank-search,
+.branch-search {
+    position: relative;
+}
+
+.suggestions {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    z-index: 20;
+    background: white;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
+    max-height: 60vh;
+    overflow-y: auto;
+    margin-top: 0.15rem;
+}
+
+.suggestion-item {
+    display: flex;
+    align-items: baseline;
+    gap: 0.5rem;
+    padding: 0.45rem 0.75rem;
+    cursor: pointer;
+    border-bottom: 1px solid #f0f0f0;
+}
+
+.suggestion-item:last-of-type {
+    border-bottom: none;
+}
+
+.suggestion-item:hover,
+.suggestion-item.active {
+    background: #e8f4f8;
+}
+
+.sug-code {
+    font-weight: 700;
+    color: #2c3e50;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.sug-code .code-label {
+    font-size: 0.62rem;
+    font-weight: 600;
+    color: #fff;
+    background: #2c3e50;
+    border-radius: 3px;
+    padding: 0 0.25rem;
+    margin-right: 0.2rem;
+}
+
+.suggestion-item .sug-code:nth-of-type(2) .code-label {
+    background: #3498db;
+}
+
+.sug-name {
+    color: #333;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.sug-kana {
+    margin-left: auto;
+    font-size: 0.78rem;
+    color: #999;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.suggestion-footer,
+.suggestion-empty {
+    padding: 0.4rem 0.75rem;
+    font-size: 0.78rem;
+    color: #888;
+    background: #fafafa;
 }
 
 .results {
@@ -303,6 +448,10 @@ footer a:hover {
 
     .clear-btn {
         margin-left: 0;
-        margin-top: 0.5rem;
+        margin-top: 0;
+    }
+
+    .sug-kana {
+        display: none;
     }
 }
