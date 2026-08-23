@@ -17,24 +17,28 @@
     let nameHistory = null;
     let nameHistoryLoaded = false;
 
-    const elements = {
-        bankInput: document.getElementById('bank-input'),
-        bankSearchBtn: document.getElementById('bank-search-btn'),
-        bankResults: document.getElementById('bank-results'),
-        bankSuggestions: document.getElementById('bank-suggestions'),
-        selectedBankSection: document.getElementById('selected-bank'),
-        selectedBankCode: document.getElementById('selected-bank-code'),
-        selectedBankName: document.getElementById('selected-bank-name'),
-        selectedBankOldNames: document.getElementById('selected-bank-old-names'),
-        clearBankBtn: document.getElementById('clear-bank'),
-        branchSearchSection: document.getElementById('branch-search-section'),
-        branchInput: document.getElementById('branch-input'),
-        branchSearchBtn: document.getElementById('branch-search-btn'),
-        branchSuggestions: document.getElementById('branch-suggestions'),
-        branchResults: document.getElementById('branch-results'),
-        errorMessage: document.getElementById('error-message'),
-        loading: document.getElementById('loading')
-    };
+    const elements = {};
+
+    if (typeof document !== 'undefined' && document.getElementById) {
+        Object.assign(elements, {
+            bankInput: document.getElementById('bank-input'),
+            bankSearchBtn: document.getElementById('bank-search-btn'),
+            bankResults: document.getElementById('bank-results'),
+            bankSuggestions: document.getElementById('bank-suggestions'),
+            selectedBankSection: document.getElementById('selected-bank'),
+            selectedBankCode: document.getElementById('selected-bank-code'),
+            selectedBankName: document.getElementById('selected-bank-name'),
+            selectedBankOldNames: document.getElementById('selected-bank-old-names'),
+            clearBankBtn: document.getElementById('clear-bank'),
+            branchSearchSection: document.getElementById('branch-search-section'),
+            branchInput: document.getElementById('branch-input'),
+            branchSearchBtn: document.getElementById('branch-search-btn'),
+            branchSuggestions: document.getElementById('branch-suggestions'),
+            branchResults: document.getElementById('branch-results'),
+            errorMessage: document.getElementById('error-message'),
+            loading: document.getElementById('loading')
+        });
+    }
 
     // 候補表示の状態（銀行・支店で共通の構造）
     function createSuggestState(input, container, max) {
@@ -83,7 +87,8 @@
     }
 
     function hankaku(text) {
-        return (window.ZenginKana && ZenginKana.toHankaku(text)) || '';
+        var g = typeof window !== 'undefined' ? window : globalThis;
+        return (g.ZenginKana && g.ZenginKana.toHankaku(text)) || '';
     }
 
     function showError(message) {
@@ -377,10 +382,11 @@
     // --- インクリメンタル候補表示 ---
 
     function debounce(fn, ms) {
+        var g = typeof window !== 'undefined' ? window : globalThis;
         let timer = null;
         return function(...args) {
-            window.clearTimeout(timer);
-            timer = window.setTimeout(() => fn.apply(this, args), ms);
+            g.clearTimeout(timer);
+            timer = g.setTimeout(() => fn.apply(this, args), ms);
         };
     }
 
@@ -458,7 +464,7 @@
                 `</div>`;
         }
         return `<div class="suggestion-item" role="option" id="${id}" data-index="${index}" aria-selected="false">` +
-            `<span class="sug-code"><span class="code-label">銀行</span>${escapeHtml(selectedBank.code)}</span>` +
+            `<span class="sug-code"><span class="code-label">銀行</span>${escapeHtml(selectedBank ? selectedBank.code : '')}</span>` +
             `<span class="sug-code"><span class="code-label">支店</span>${escapeHtml(item.code)}</span>` +
             `<span class="sug-name">${escapeHtml(item.name)}</span>` +
             `<span class="sug-kana">${kana}</span>` +
@@ -565,26 +571,46 @@
     const debouncedUpdateBankSuggestions = debounce(updateBankSuggestions, SUGGEST_DEBOUNCE_MS);
     const debouncedUpdateBranchSuggestions = debounce(updateBranchSuggestions, SUGGEST_DEBOUNCE_MS);
 
-    // 入力欄外のポインタ操作で候補を閉じる
-    document.addEventListener('pointerdown', (e) => {
-        for (const state of [bankSuggest, branchSuggest]) {
-            if (state.open && !state.container.contains(e.target) && e.target !== state.input) {
-                closeSuggestions(state);
+    // Browser-only setup
+    if (typeof document !== 'undefined' && document.getElementById) {
+        // 入力欄外のポインタ操作で候補を閉じる
+        document.addEventListener('pointerdown', (e) => {
+            for (const state of [bankSuggest, branchSuggest]) {
+                if (state.open && !state.container.contains(e.target) && e.target !== state.input) {
+                    closeSuggestions(state);
+                }
             }
-        }
-    });
+        });
 
-    // --- イベント接続 ---
+        // --- イベント接続 ---
 
-    elements.bankSearchBtn.addEventListener('click', handleBankSearch);
-    elements.bankInput.addEventListener('keydown', handleInputKeydown(bankSuggest, handleBankSearch));
-    elements.bankInput.addEventListener('input', debouncedUpdateBankSuggestions);
+        elements.bankSearchBtn.addEventListener('click', handleBankSearch);
+        elements.bankInput.addEventListener('keydown', handleInputKeydown(bankSuggest, handleBankSearch));
+        elements.bankInput.addEventListener('input', debouncedUpdateBankSuggestions);
 
-    elements.branchSearchBtn.addEventListener('click', handleBranchSearch);
-    elements.branchInput.addEventListener('keydown', handleInputKeydown(branchSuggest, handleBranchSearch));
-    elements.branchInput.addEventListener('input', debouncedUpdateBranchSuggestions);
+        elements.branchSearchBtn.addEventListener('click', handleBranchSearch);
+        elements.branchInput.addEventListener('keydown', handleInputKeydown(branchSuggest, handleBranchSearch));
+        elements.branchInput.addEventListener('input', debouncedUpdateBranchSuggestions);
 
-    elements.clearBankBtn.addEventListener('click', clearSelectedBank);
+        elements.clearBankBtn.addEventListener('click', clearSelectedBank);
 
-    loadBanks().then(loadNameHistory).catch(() => {});
+        loadBanks().then(loadNameHistory).catch(() => {});
+    }
+
+    const ZenginApp = {
+        createSuggestState,
+        closeSuggestions,
+        openSuggestions,
+        setActiveSuggestion,
+        moveActiveSuggestion,
+        handleInputKeydown,
+        optionId,
+        suggestionItemHtml,
+    };
+    if (typeof module !== 'undefined' && module.exports) {
+        module.exports = ZenginApp;
+    }
+    if (typeof globalThis !== 'undefined') {
+        globalThis.ZenginApp = ZenginApp;
+    }
 })();
