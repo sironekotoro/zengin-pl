@@ -16,8 +16,7 @@ binmode Test::More->builder->failure_output, ':encoding(UTF-8)';
 # ・実データ全レコードでの NFKC 往復一致
 # を Node で実行して検証する。
 #
-# 前提: web/data が生成済みなら実データ検証も実施する。
-# 未生成・Node 不在の場合はスキップ（Deploy workflow では生成後に実行される）。
+# checkout に含まれる固定 fixture を検証する。
 
 my $repo_root = dirname( dirname( abs_path(__FILE__) ) );
 my $test_js = File::Spec->catfile( $repo_root, 't', 'web_kana_test.js' );

@@ -17,16 +17,14 @@ binmode Test::More->builder->failure_output, ':encoding(UTF-8)';
 # ・code 昇順の安定ソート
 # を Node で実行して検証する。
 #
-# 前提: web/data が生成済みであること（perl tools/generate_web_data.pl）。
-# 未生成・Node 不在の場合はスキップ（Deploy workflow では生成後に実行される）。
+# checkout に含まれる固定 fixture を使う。Pages build はデータを生成しない。
 
 my $repo_root = dirname( dirname( abs_path(__FILE__) ) );
-my $banks_json =
-  File::Spec->catfile( $repo_root, 'web', 'data', 'banks.json' );
+my $fixture_banks = File::Spec->catfile( $repo_root, 't', 'fixtures', 'web-data', 'banks.json' );
 my $test_js = File::Spec->catfile( $repo_root, 't', 'web_search_test.js' );
 
 my $skip_msg;
-$skip_msg = 'web/data が未生成 (perl tools/generate_web_data.pl を実行)' unless -f $banks_json;
+$skip_msg = 'Web検索fixtureが見つかりません' unless -f $fixture_banks;
 
 my $node = _find_node();
 $skip_msg ||= 'node.js が利用できません (Node.js のインストールで有効化)' unless defined $node;

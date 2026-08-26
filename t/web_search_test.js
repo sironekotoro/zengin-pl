@@ -7,8 +7,7 @@
 //   - それ以外は name/kana/hira/code へのリテラル部分一致（roma は対象外）
 //   - 結果は bank code / branch code の昇順で安定ソート
 //
-// 前提: 事前に `perl tools/generate_web_data.pl` を実行し web/data を生成
-//（t/ 配下に生成済みデータがない場合は t/21.web_search.t 側でスキップされる）。
+// t/fixtures/web-data の小さな固定 fixture を使う。Pages build はデータを生成しない。
 
 const fs = require('fs');
 const path = require('path');
@@ -16,13 +15,14 @@ const path = require('path');
 const root = path.resolve(__dirname, '..');
 const ZenginSearch = require(path.join(root, 'web', 'search.js'));
 
-const banks = JSON.parse(
-    fs.readFileSync(path.join(root, 'web', 'data', 'banks.json'), 'utf8')
-);
+const fixtureRoot = path.join(root, 't', 'fixtures', 'web-data');
+const dataRoot = fixtureRoot;
+
+const banks = JSON.parse(fs.readFileSync(path.join(dataRoot, 'banks.json'), 'utf8'));
 
 function loadBranches(code) {
     return JSON.parse(
-        fs.readFileSync(path.join(root, 'web', 'data', 'branches', code + '.json'), 'utf8')
+        fs.readFileSync(path.join(dataRoot, 'branches', code + '.json'), 'utf8')
     );
 }
 

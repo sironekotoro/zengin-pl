@@ -1,7 +1,6 @@
 (function() {
     'use strict';
 
-    const DATA_BASE = 'data';
     const SUGGEST_DEBOUNCE_MS = 200;
     const BANK_SUGGEST_MAX = 8;
     const BRANCH_SUGGEST_MAX = 10;
@@ -9,9 +8,10 @@
     let banksData = null;
     let branchesCache = {};
     let selectedBank = null;
+    const dataSource = ZenginData.createDataSource(window.ZenginDataConfig);
 
     // 旧銀行名オーバーレイ（任意ファイル）。
-    // data/bank_name_history.json が存在する場合のみ読み込む:
+    // Pages root の bank_name_history.json が存在する場合のみ読み込む:
     //   { "0001": [ { "name": "旧銀行名", "valid_to": "YYYY-MM-DD" } ] }
     // ファイルが無い・壊れている場合は黙ってスキップする（データは未整備）。
     let nameHistory = null;
@@ -33,7 +33,8 @@
         branchSuggestions: document.getElementById('branch-suggestions'),
         branchResults: document.getElementById('branch-results'),
         errorMessage: document.getElementById('error-message'),
-        loading: document.getElementById('loading')
+        loading: document.getElementById('loading'),
+        dataUpdatedAt: document.getElementById('data-updated-at')
     };
 
     // 候補表示の状態（銀行・支店で共通の構造）
@@ -114,12 +115,14 @@
 
         showLoading();
         try {
-            const response = await fetch(`${DATA_BASE}/banks.json`);
-            if (!response.ok) throw new Error('Failed to load banks data');
-            banksData = await response.json();
+            banksData = await dataSource.loadBanks();
             return banksData;
         } catch (e) {
-            showError('データの読み込みに失敗しました: ' + e.message);
+            if (e && e.code === 'revision') {
+                showError('最新データの確認に失敗しました。銀行データを読み込めません。');
+            } else {
+                showError('銀行データの読み込みに失敗しました: ' + e.message);
+            }
             throw e;
         } finally {
             hideLoading();
@@ -131,7 +134,8 @@
         if (nameHistoryLoaded) return nameHistory;
         nameHistoryLoaded = true;
         try {
-            const response = await fetch(`${DATA_BASE}/bank_name_history.json`);
+            // 改称履歴は mirror の本体データではなく、Pages側の任意overlay。
+            const response = await fetch('bank_name_history.json');
             if (response.ok) {
                 const data = await response.json();
                 if (data && typeof data === 'object' && !Array.isArray(data)) {
@@ -176,9 +180,7 @@
 
         showLoading();
         try {
-            const response = await fetch(`${DATA_BASE}/branches/${bankCode}.json`);
-            if (!response.ok) throw new Error('Failed to load branches data');
-            const branches = await response.json();
+            const branches = await dataSource.loadBranches(bankCode);
             branchesCache[bankCode] = branches;
             return branches;
         } catch (e) {
@@ -565,6 +567,39 @@
     const debouncedUpdateBankSuggestions = debounce(updateBankSuggestions, SUGGEST_DEBOUNCE_MS);
     const debouncedUpdateBranchSuggestions = debounce(updateBranchSuggestions, SUGGEST_DEBOUNCE_MS);
 
+    function formatUpdatedAt(updatedAt) {
+        return `${updatedAt.slice(0, 4)}年${Number(updatedAt.slice(4, 6))}月${Number(updatedAt.slice(6, 8))}日`;
+    }
+
+    function setUpdatedAtText(text) {
+        elements.dataUpdatedAt.textContent = text;
+    }
+
+    async function loadUpdatedAt() {
+        try {
+            const updatedAt = await dataSource.loadUpdatedAt();
+            setUpdatedAtText(`データ更新日: ${formatUpdatedAt(updatedAt)}`);
+        } catch (e) {
+            // 更新日の表示失敗は検索機能の失敗にしない。
+            setUpdatedAtText('データ更新日: 取得できません');
+        }
+    }
+
+    async function initializeData() {
+        try {
+            // JSON取得より先にrevisionを確認し、以後の取得URLを固定する。
+            await dataSource.loadRevision();
+        } catch (e) {
+            setUpdatedAtText('データ更新日: 取得できません');
+            showError('最新データの確認に失敗しました。銀行データを読み込めません。');
+            return;
+        }
+
+        loadUpdatedAt();
+        loadBanks().catch(() => {});
+        loadNameHistory().catch(() => {});
+    }
+
     // 入力欄外のポインタ操作で候補を閉じる
     document.addEventListener('pointerdown', (e) => {
         for (const state of [bankSuggest, branchSuggest]) {
@@ -586,5 +621,5 @@
 
     elements.clearBankBtn.addEventListener('click', clearSelectedBank);
 
-    loadBanks().then(loadNameHistory).catch(() => {});
+    initializeData();
 })();

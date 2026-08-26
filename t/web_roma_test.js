@@ -7,10 +7,10 @@
 // 実際のブラウザでカードの `.result-roma` 行の有無を検証する。
 //
 // 前提: Chrome が `/usr/bin/google-chrome` または macOS アプリとして存在すること。
-// 存在しない環境では自身をスキップする。web/data は生成済みであること。
+// 存在しない環境では自身をスキップする。データはテスト用 fixture を一時配置する。
 
 const { spawn } = require('node:child_process');
-const { mkdtempSync, rmSync, cpSync, existsSync } = require('node:fs');
+const { mkdtempSync, rmSync, cpSync, existsSync, mkdirSync, writeFileSync } = require('node:fs');
 const { tmpdir } = require('node:os');
 const { join, resolve } = require('node:path');
 
@@ -96,10 +96,33 @@ function check(label, cond, detail) {
     console.log((cond ? 'ok   ' : 'FAIL ') + label + (cond ? '' : ' -> ' + JSON.stringify(detail)));
 }
 
+function writeFixture(tmpWeb) {
+    const dataDir = join(tmpWeb, 'data');
+    const branchesDir = join(dataDir, 'branches');
+    const revision = process.env.TEST_REVISION_FAILURE
+        ? 'not-a-sha'
+        : '647513f71c69505e09deb7a1da1717ec22dabedc';
+    rmSync(dataDir, { recursive: true, force: true });
+    mkdirSync(branchesDir, { recursive: true });
+    writeFileSync(join(dataDir, 'revision'), revision + '\n');
+    if (!process.env.TEST_UPDATED_AT_FAILURE && !process.env.TEST_REVISION_FAILURE) {
+        writeFileSync(join(dataDir, 'updated_at'), '20260630\n');
+    }
+    writeFileSync(join(dataDir, 'banks.json'), JSON.stringify({
+        '0001': { code: '0001', name: 'みずほ', kana: 'ミズホ', hira: 'みずほ', roma: 'mizuho' },
+        '0005': { code: '0005', name: '三菱ＵＦＪ', kana: 'ミツビシユ－エフジエイ', hira: 'みつびしゆ－えふじえい', roma: 'mitsubishiyu-efujiei' },
+        '0006': { code: '0006', name: '三菱信託', kana: 'ミツビシシンタク', hira: 'みつびししんたく', roma: 'mitsubishishintaku' }
+    }));
+    writeFileSync(join(branchesDir, '0001.json'), JSON.stringify({
+        '001': { code: '001', name: '東京営業部', kana: 'トウキヨウ', hira: 'とうきよう', roma: 'toukiyou' }
+    }));
+}
+
 (async () => {
-    // web/ を一時ディレクトリへコピー（データ含む）
+    // web/ を一時ディレクトリへコピーし、テスト用データを配置する。
     const tmpWeb = mkdtempSync(join(tmpdir(), 'zengin-roma-'));
     cpSync(join(repoRoot, 'web'), tmpWeb, { recursive: true });
+    writeFixture(tmpWeb);
 
     const httpServer = spawn('python3', ['-m', 'http.server', String(HTTP_PORT), '--bind', '127.0.0.1'], {
         cwd: tmpWeb,
@@ -132,11 +155,34 @@ function check(label, cond, detail) {
         await cdp.ready();
         await cdp.send('Runtime.enable');
         await cdp.send('Page.enable');
+        await cdp.send('Page.addScriptToEvaluateOnNewDocument', {
+            source: "window.ZenginDataConfig = { baseUrl: 'data' };"
+        });
         await cdp.send('Page.navigate', { url: `http://127.0.0.1:${HTTP_PORT}/index.html` });
         await sleep(1500);
 
-        // 銀行検索（複数件 → カード一覧）で roma 行が表示される
-        const bankRoma = await cdp.eval(`(async () => {
+        const updatedAt = await cdp.eval(`document.getElementById('data-updated-at').textContent`);
+        if (process.env.TEST_REVISION_FAILURE) {
+            check('revision失敗時に更新日を利用不可表示にする', updatedAt.includes('取得できません'), updatedAt);
+            await cdp.eval(`(async () => {
+                const input = document.getElementById('bank-input');
+                input.value = 'みずほ';
+                input.dispatchEvent(new Event('input', { bubbles: true }));
+                input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+                await new Promise(r => setTimeout(r, 400));
+            })()`);
+            const revisionError = await cdp.eval(`document.getElementById('error-message').textContent`);
+            check('revision失敗時に銀行データ取得を止める', revisionError.includes('最新データの確認に失敗'), revisionError);
+            check('revision失敗時に銀行結果を表示しない', await cdp.eval(`document.getElementById('bank-results').classList.contains('hidden')`));
+        } else if (process.env.TEST_UPDATED_AT_FAILURE) {
+            check('updated_at失敗時に更新日を利用不可表示にする', updatedAt.includes('取得できません'), updatedAt);
+        } else {
+            check('データ更新日が表示される', updatedAt.includes('2026年6月30日'), updatedAt);
+        }
+
+        if (!process.env.TEST_REVISION_FAILURE) {
+            // 銀行検索（複数件 → カード一覧）で roma 行が表示される
+            const bankRoma = await cdp.eval(`(async () => {
             const input = document.getElementById('bank-input');
             input.value = '三菱';
             input.dispatchEvent(new Event('input', { bubbles: true }));
@@ -151,13 +197,13 @@ function check(label, cond, detail) {
                 romaCount: romaLines.length,
                 sample: romaLines[0] ? romaLines[0].textContent : null,
             };
-        })()`);
-        check('銀行検索で複数カードが出る', bankRoma.cardCount >= 2, bankRoma);
-        check('銀行カードに roma 行がある', bankRoma.romaCount >= 1, bankRoma);
-        check('銀行カードの roma に値がある', bankRoma.sample && bankRoma.sample.trim().length > 0, bankRoma);
+            })()`);
+            check('銀行検索で複数カードが出る', bankRoma.cardCount >= 2, bankRoma);
+            check('銀行カードに roma 行がある', bankRoma.romaCount >= 1, bankRoma);
+            check('銀行カードの roma に値がある', bankRoma.sample && bankRoma.sample.trim().length > 0, bankRoma);
 
-        // 支店検索（複数件）で roma 行が表示される
-        const branchRoma = await cdp.eval(`(async () => {
+            // 支店検索（複数件）で roma 行が表示される
+            const branchRoma = await cdp.eval(`(async () => {
             const selectedVisible = !document.getElementById('selected-bank').classList.contains('hidden');
             if (!selectedVisible) {
                 const input = document.getElementById('bank-input');
@@ -183,10 +229,11 @@ function check(label, cond, detail) {
                 romaCount: romaLines.length,
                 sample: romaLines[0] ? romaLines[0].textContent : null,
             };
-        })()`);
-        check('支店検索でカードが出る', branchRoma.cardCount >= 1, branchRoma);
-        check('支店カードに roma 行がある', branchRoma.romaCount >= 1, branchRoma);
-        check('支店カードの roma に値がある', branchRoma.sample && branchRoma.sample.trim().length > 0, branchRoma);
+            })()`);
+            check('支店検索でカードが出る', branchRoma.cardCount >= 1, branchRoma);
+            check('支店カードに roma 行がある', branchRoma.romaCount >= 1, branchRoma);
+            check('支店カードの roma に値がある', branchRoma.sample && branchRoma.sample.trim().length > 0, branchRoma);
+        }
 
         // ページ読み込み時の JS 例外がない
         check('ページ読み込み時の JS 例外がない', cdp.exceptions.length === 0, cdp.exceptions);

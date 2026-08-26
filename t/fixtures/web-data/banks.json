@@ -1,0 +1,7 @@
+{
+  "0001": {"code":"0001", "name":"みずほ", "kana":"ミズホ", "hira":"みずほ", "roma":"mizuho"},
+  "0005": {"code":"0005", "name":"三菱ＵＦＪ", "kana":"ミツビシユ－エフジエイ", "hira":"みつびしゆ－えふじえい", "roma":"mitsubishiyu-efujiei"},
+  "0006": {"code":"0006", "name":"三菱信託", "kana":"ミツビシシンタク", "hira":"みつびししんたく", "roma":"mitsubishishintaku"},
+  "0010": {"code":"0010", "name":"東京銀行", "kana":"トウキヨウギンコウ", "hira":"とうきようぎんこう", "roma":"toukyouginkou"},
+  "0020": {"code":"0020", "name":"東京信金", "kana":"トウキヨウシンキン", "hira":"とうきようしんきん", "roma":"toukyoushinkin"}
+}

@@ -14,17 +14,13 @@ binmode Test::More->builder->failure_output, ':encoding(UTF-8)';
 # ブラウザ（ヘッドレス Chrome）での roma（ローマ字）表示退行テスト。
 # 銀行・支店カードに .result-roma が表示されることを E2E で検証する。
 #
-# 前提: web/data が生成済み（perl tools/generate_web_data.pl）。
-#       Chrome が利用可能な環境でのみ実行（t/web_roma_test.js が内部で検出・
+# 前提: Chrome が利用可能な環境でのみ実行（t/web_roma_test.js が内部で検出・
 #       見つからない場合は自身をスキップする）。Node 不在の場合はここで skip。
 
 my $repo_root = dirname( dirname( abs_path(__FILE__) ) );
-my $banks_json =
-  File::Spec->catfile( $repo_root, 'web', 'data', 'banks.json' );
 my $test_js = File::Spec->catfile( $repo_root, 't', 'web_roma_test.js' );
 
 my $skip_msg;
-$skip_msg = 'web/data が未生成 (perl tools/generate_web_data.pl を実行)' unless -f $banks_json;
 $skip_msg ||= 'node.js が利用できません (Node.js のインストールで有効化)'
   unless defined _find_node();
 

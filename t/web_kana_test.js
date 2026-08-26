@@ -55,8 +55,10 @@ eq('空文字は空文字', ZenginKana.toHankaku(''), '');
 eq('null は空文字', ZenginKana.toHankaku(null), '');
 eq('undefined は空文字', ZenginKana.toHankaku(undefined), '');
 
-// --- 実データ全体での NFKC 往復一致（web/data 生成済みの場合のみ） ---
-const banksPath = path.join(root, 'web', 'data', 'banks.json');
+// --- checkout に含まれる固定 fixture で検証 ---
+const fixtureRoot = path.join(root, 't', 'fixtures', 'web-data');
+const dataRoot = fixtureRoot;
+const banksPath = path.join(dataRoot, 'banks.json');
 if (fs.existsSync(banksPath)) {
     const banks = JSON.parse(fs.readFileSync(banksPath, 'utf8'));
     let records = 0;
@@ -76,7 +78,7 @@ if (fs.existsSync(banksPath)) {
         verify(banks[code].kana, `banks:${code}`);
     }
 
-    const branchesDir = path.join(root, 'web', 'data', 'branches');
+    const branchesDir = path.join(dataRoot, 'branches');
     for (const file of fs.readdirSync(branchesDir)) {
         const branches = JSON.parse(
             fs.readFileSync(path.join(branchesDir, file), 'utf8')
@@ -86,9 +88,8 @@ if (fs.existsSync(banksPath)) {
         }
     }
 
-    check('検証対象レコードが十分にある', records > 10000, String(records));
 } else {
-    console.log('web/data 未生成のため実データ検証はスキップ');
+    console.log('Webデータfixtureが見つからないためデータ検証はスキップ');
 }
 
 if (failures.length) {

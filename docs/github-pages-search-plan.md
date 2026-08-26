@@ -1,12 +1,11 @@
 # GitHub Pages 銀行・支店検索ページ 実装計画
 
-- ステータス: draft
+- ステータス: 実装済み（データ配信方式は 2026-08 に更新）
 - 作成日: 2026-08-16
-- 種別: 計画整理のみ（実装しない）
+- 種別: 実装仕様・将来 TODO
 
 本ドキュメントは、既存の Slack Slash Command `/zengin` の検索仕様を踏襲した
-GitHub Pages 上の Web 検索ページを将来実装するための計画です。
-現時点では**実装を行わず、TODO として整理**することを目的とします。
+GitHub Pages 上の Web 検索ページの仕様と将来 TODO を記録します。
 
 ---
 
@@ -72,25 +71,20 @@ GitHub Pages は静的サイトのみ配信できるため、**server-side backe
 ### 推奨構成（MVP）
 
 ```
-web/                    … ビルド生成物（GitHub Pages の公開 root）
+web/                    … GitHub Pages の公開 root
   index.html            … SPA 検索フォーム
   app.js                … 検索ロジック + UI 操作
+  data-source.js        … mirror の revision/JSON 取得とキャッシュURL生成
   style.css
-  data/
-    banks.json          … banks.json を整形（必要なら軽量化）
-    branches/{code}.json … 支店 JSON（必要銀行分のみ）
-    meta.json           … updated_at / revision を記録（表示用）
 ```
 
 - 検索はすべてブラウザ側 JS で行う（サーバー不要、secrets 不要）。
-- `zengin-data-mirror` をビルド時に取得して上記 JSON を生成する。
-  - banks.json（約 200KB）、支店 1000 ファイル。
-  - 全支店 JSON を無条件生成するか、銀行コードが参照時のみ生成するか、MVP で要判断。
-  - データ量が大きい場合は、銀行ごとに軽量化（出力項目を絞る）も選択肢。
+- `zengin-data-mirror` の `revision` を起動時に取得し、その値を query に付けた
+  raw URL から必要な JSON を取得する。Pages artifact には銀行・支店 JSON を含めない。
 
 ### 共通データ / 共通ロジック
 
-- データのソースは mirror を **単一の正** にし、Web 用 JSON はここから**生成**する（手二重管理を避ける）。
+- データのソースは mirror を **単一の正** とし、Web は runtime に直接参照する（手二重管理を避ける）。
 - 検索ロジックは Perl（`Zengin::Pl`/`CLI`）と JS で実装が揃うため、二重実装が避けられない部分がある。
   対処案:
   1. 検索の**仕様書**を本計画ドキュメントに記載し、JS はそれに追従（テストで検証）。
@@ -100,11 +94,14 @@ web/                    … ビルド生成物（GitHub Pages の公開 root）
   3. より大掛かりだが、Perl で正規化した中間 JSON（検索用インデックス）を生成し、
      JS はそれを参照するだけにする方式も将来候補。
 
-### ランタイムで mirror を直接叩く代替案（非推奨）
+### ランタイムで mirror を直接参照する方式（採用）
 
-- GitHub Pages は CORS 制約があり、`raw.githubusercontent.com` は全体で許可されているので
-  直接fetchは可能。ただし更新タイミング・オフライン・帯域・rate limit を自前管理する必要が
-  あり、ビルド時 JSON 生成のほうがシンプルとみなし非推奨とする。
+- `raw.githubusercontent.com` の CORS を利用してブラウザから fetch する。
+- `revision` は `cache: 'no-store'` で確認し、JSON は
+  `main/data/...?...v=<revision>` として通常キャッシュを利用する。
+- `revision` は mirror が取り込んだデータ状態の識別子であり、mirror の Git ref とは限らないため、
+  URL の ref には使わない。
+- revision を取得できない場合は、古いデータを最新と誤認しないため JSON を取得しない。
 
 ---
 
@@ -181,15 +178,15 @@ web/                    … ビルド生成物（GitHub Pages の公開 root）
 更新フロー（Web 版 JSON を手動で二重管理しない設計）
 
 1. mirror に新しい `updated_at` が出る
-2. （手動 or CI）mirror から取得して `web/data/` を再生成
-3. テスト（検索 corpus の回帰）
-4. Pages へ deploy（GitHub Pages 用の publish ブランチ / `actions` を更新）
+2. Web 起動時に revision を取得し、その revision の JSON を参照
+3. テスト（検索 corpus とデータ取得層の回帰）
+4. Pages の UI を deploy（mirror 更新だけでは Pages の再 deploy 不要）
 
 ### 更新手段の候補
 
 | 方法 | 説明 |
 |---|---|
-| 手動 | `perl` の生成スクリプトを `tools/` か `web/` 付近に置き、commit して push |
+| 手動 | UI の変更を commit して push |
 | GitHub Actions (schedule) | 既存 `update-google-sheet.yml` と同様に `updated_at` を state（`.github/state/` を想定）で比較して変更時のみ commit |
 | push 連動 | mirror の更新を検知して push（更新検知は schedule workflow が現実的） |
 
@@ -273,7 +270,7 @@ MVP には含めない。
 最初の実装範囲を以下に限定する。
 
 1. GitHub Pages を有効化
-2. 銀行・支店データを静的 JSON として生成（ビルド時）
+2. mirror の銀行・支店データをブラウザから直接参照
 3. 単一ページの検索フォーム
 4. 銀行名 / 銀行コード検索
 5. 銀行内の支店名 / 支店コード検索
@@ -300,7 +297,7 @@ MVP 完成条件:
 - [ ] Slack 版と代表ケース（corpus）の結果が一致する
 - [ ] 0 件 / 複数件が正しく表示される
 - [ ] スマートフォンでも最低限利用可能（レスポンシブの最小対応）
-- [ ] 元データ更新時に Web 用 JSON を再生成できる
+- [ ] 元データ更新時に revision 変更後の JSON を参照できる
 - [ ] secrets 不要で静的に公開できる
 
 ---
@@ -316,7 +313,7 @@ MVP 完成条件:
 | TODO | 説明 | status |
 |---|---|---|
 | Inspect and extract reusable search logic | `/zengin` の検索仕様をライブラリ/CLI から抽出し、Web 用参照仕様とする | planned |
-| Generate static bank/branch search data | mirror → `web/data/*.json`（+ `meta.json`）生成 | planned |
+| Load versioned mirror data | revision を確認し、revision付きの mirror JSON を取得 | completed |
 | Build GitHub Pages search MVP | index.html + app.js + style.css（SPA 検索フォーム） | planned |
 | Add regression tests against Slack search | 検索 corpus で Perl 版 vs JS 版の一致テスト | planned |
 | Configure GitHub Pages deployment | Pages ブランチ設定 + デプロイ workflow（または Actions で deploy） | planned |
@@ -332,12 +329,12 @@ MVP 完成条件:
 
 ## 15. Out of scope
 
-本計画整理では以下を**実装しない**。
+今後の追加範囲として以下は**実装しない**。
 
 - GitHub Pages 有効化
 - HTML / JavaScript 実装
-- データ生成処理
-- GitHub Actions 追加
+- データ生成処理（Pages 用）
+- Pages workflow の大規模再設計
 - Analytics 導入
 - アフィリエイト導入
 - Slack 版の仕様変更
@@ -357,7 +354,7 @@ MVP 完成条件:
 3. **CLI の並び順**と、ライブラリ `search()` の並び順が非保証。Web 実装では並び順を明示的に定める。
 4. **検索の二重実装**: JS 化の際に部分一致の大文字/小文字（roma）・全角数字・
     カナ/ひらがなの正規化は Perl と JS で挙動が変わりやすい。corpus 回帰テストを強く推奨。
-5. **CORS の制約**: 配布物は Pages 経由（同オリジン）で JSON を配る前提にする。
+5. **CORS の制約**: `raw.githubusercontent.com` の CORS 応答を実装時に確認済み。
 6. **ブランチ名 / 公開 root**: `gh-pages` ブランチ or `docs/` ディレクトリ or `main` 直下かは決定保留。
     Pages の更新手段（Actions での deploy 等）と配布物分離の判断を実装フェーズで行う。
 
@@ -399,7 +396,7 @@ GitHub Issue #1（GitHub Pages検索UI改善）として実装した機能と、
 
 - 現在のデータソース（mirror）に改称履歴は**存在しない**ため、実データは埋め込まない。
 - その代わり、将来追加できる仕組みとして任意ファイル
-   `web/data/bank_name_history.json` を読み込む。存在しない / 失敗時は黙って無視する。
+   `web/bank_name_history.json` を読み込む。存在しない / 失敗時は黙って無視する。
 
   ```json
   {
