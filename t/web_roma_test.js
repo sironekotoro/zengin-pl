@@ -47,6 +47,83 @@ async function waitFor(fn, timeoutMs, label) {
     throw new Error('timeout waiting for ' + label);
 }
 
+function processExited(child) {
+    return child.exitCode !== null || child.signalCode !== null;
+}
+
+function waitForProcessExit(child, timeoutMs) {
+    if (processExited(child)) return Promise.resolve(true);
+
+    return new Promise((resolve) => {
+        let settled = false;
+        const onExit = () => finish(true);
+        const timer = setTimeout(() => finish(processExited(child)), timeoutMs);
+        const finish = (exited) => {
+            if (settled) return;
+            settled = true;
+            clearTimeout(timer);
+            child.removeListener('exit', onExit);
+            resolve(exited);
+        };
+
+        child.once('exit', onExit);
+        if (processExited(child)) finish(true);
+    });
+}
+
+async function stopProcess(child, label) {
+    if (processExited(child)) return { exited: true, forced: false };
+
+    let signalError;
+    try {
+        child.kill('SIGTERM');
+    } catch (e) {
+        signalError = e;
+    }
+    if (await waitForProcessExit(child, 5000)) {
+        return { exited: true, forced: false };
+    }
+
+    try {
+        child.kill('SIGKILL');
+    } catch (e) {
+        signalError = signalError || e;
+    }
+    const exited = await waitForProcessExit(child, 5000);
+    return {
+        exited,
+        forced: true,
+        error: exited
+            ? null
+            : `${label} did not exit after SIGTERM/SIGKILL${signalError ? `: ${signalError.message}` : ''}`,
+    };
+}
+
+async function removeDirectoryWithRetry(directory, label) {
+    const deadline = Date.now() + 10000;
+    const retryableCodes = new Set(['EBUSY', 'ENOTEMPTY', 'EPERM']);
+    let lastError;
+
+    while (Date.now() < deadline) {
+        try {
+            rmSync(directory, {
+                recursive: true,
+                force: true,
+                maxRetries: 5,
+                retryDelay: 200,
+            });
+            return true;
+        } catch (e) {
+            lastError = e;
+            if (!retryableCodes.has(e.code)) break;
+            await sleep(250);
+        }
+    }
+
+    console.warn(`cleanup warning: ${label} を削除できませんでした: ${lastError ? lastError.message : 'unknown error'}`);
+    return false;
+}
+
 class Cdp {
     constructor(wsUrl) {
         this.ws = new WebSocket(wsUrl);
@@ -91,6 +168,25 @@ class Cdp {
 }
 
 const failures = [];
+const processFailures = [];
+function recordProcessFailure(label, detail) {
+    const message = `${label}: ${detail}`;
+    if (!processFailures.includes(message)) processFailures.push(message);
+}
+
+function monitorProcess(child, label) {
+    const state = { expectedTermination: false };
+    child.on('error', (e) => {
+        if (!state.expectedTermination) recordProcessFailure(label, `process error (${e.message})`);
+    });
+    child.on('exit', (code, signal) => {
+        if (!state.expectedTermination) {
+            recordProcessFailure(label, `unexpected exit (code=${code}, signal=${signal})`);
+        }
+    });
+    return state;
+}
+
 function check(label, cond, detail) {
     if (!cond) failures.push(label + (detail ? ': ' + JSON.stringify(detail) : ''));
     console.log((cond ? 'ok   ' : 'FAIL ') + label + (cond ? '' : ' -> ' + JSON.stringify(detail)));
@@ -128,6 +224,7 @@ function writeFixture(tmpWeb) {
         cwd: tmpWeb,
         stdio: 'ignore',
     });
+    const httpServerState = monitorProcess(httpServer, 'HTTP server');
 
     const chromeProfile = mkdtempSync(join(tmpdir(), 'zengin-roma-cp-'));
     const chrome = spawn(chromePath, [
@@ -138,6 +235,8 @@ function writeFixture(tmpWeb) {
         `--user-data-dir=${chromeProfile}`,
         'about:blank',
     ], { stdio: 'ignore' });
+    const chromeState = monitorProcess(chrome, 'Chrome');
+    let cdp;
 
     try {
         await waitFor(async () => {
@@ -151,7 +250,7 @@ function writeFixture(tmpWeb) {
             return list.find(t => t.type === 'page');
         }, 10000, 'cdp target');
 
-        const cdp = new Cdp(target.webSocketDebuggerUrl);
+        cdp = new Cdp(target.webSocketDebuggerUrl);
         await cdp.ready();
         await cdp.send('Runtime.enable');
         await cdp.send('Page.enable');
@@ -238,18 +337,48 @@ function writeFixture(tmpWeb) {
         // ページ読み込み時の JS 例外がない
         check('ページ読み込み時の JS 例外がない', cdp.exceptions.length === 0, cdp.exceptions);
 
-        cdp.close();
     } finally {
-        httpServer.kill();
-        if (chrome.exitCode === null) {
-            chrome.kill();
-            await new Promise((resolve) => {
-                chrome.once('exit', resolve);
-                setTimeout(resolve, 3000);
-            });
+        // cleanup開始前に既に終了していた場合は、終了コードにかかわらず異常終了として扱う。
+        if (processExited(chrome)) {
+            recordProcessFailure('Chrome', `unexpected exit (code=${chrome.exitCode}, signal=${chrome.signalCode})`);
         }
-        rmSync(chromeProfile, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
-        rmSync(tmpWeb, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
+        if (processExited(httpServer)) {
+            recordProcessFailure('HTTP server', `unexpected exit (code=${httpServer.exitCode}, signal=${httpServer.signalCode})`);
+        }
+
+        // CDPで終了を要求してから、実プロセスのexitイベントを待つ。profile削除を
+        // 先に行うと、Linux CIではChromeの残存ファイルによりENOTEMPTYになり得る。
+        chromeState.expectedTermination = true;
+        if (cdp) {
+            try {
+                await Promise.race([
+                    cdp.send('Browser.close'),
+                    sleep(2000),
+                ]);
+            } catch (e) {
+                // Browser.closeが応答前にWebSocketを閉じることは正常な終了でも起こる。
+            }
+            try {
+                cdp.close();
+            } catch (e) {
+                // WebSocketが既に閉じていてもcleanupは継続する。
+            }
+        }
+        const chromeStop = await stopProcess(chrome, 'Chrome');
+        if (!chromeStop.exited) recordProcessFailure('Chrome', chromeStop.error);
+
+        httpServerState.expectedTermination = true;
+        const httpServerStop = await stopProcess(httpServer, 'HTTP server');
+        if (!httpServerStop.exited) recordProcessFailure('HTTP server', httpServerStop.error);
+
+        // プロセス終了確認後の削除でも一時的にENOTEMPTYが残る場合は、テスト本体の
+        // 結果とは分離して警告だけ出す。再試行の期限を設け、ハングは避ける。
+        await removeDirectoryWithRetry(chromeProfile, 'Chrome profile');
+        await removeDirectoryWithRetry(tmpWeb, 'HTTP server root');
+
+        for (const processFailure of processFailures) {
+            if (!failures.includes(processFailure)) failures.push(processFailure);
+        }
     }
 
     if (failures.length) {
@@ -261,5 +390,8 @@ function writeFixture(tmpWeb) {
     process.exit(0);
 })().catch((e) => {
     console.error('harness error: ' + e.message);
+    for (const processFailure of processFailures) {
+        console.error('process failure: ' + processFailure);
+    }
     process.exit(1);
 });
