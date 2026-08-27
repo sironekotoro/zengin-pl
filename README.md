@@ -1,4 +1,4 @@
-[![Actions Status](https://github.com/sironekotoro/zengin-pl/actions/workflows/test.yml/badge.svg)](https://github.com/sironekotoro/zengin-pl/actions)
+[![Actions Status](https://github.com/sironekotoro/zengin-pl/actions/workflows/actions.yml/badge.svg)](https://github.com/sironekotoro/zengin-pl/actions)
 # NAME
 
 Zengin::Pl - Lightweight Perl client for Zengin Code (全銀協コード) JSON dataset
@@ -23,6 +23,28 @@ GitHub 上の JSON リポジトリから取得する軽量 Perl クライアン�
 このリポジトリの正式な配布単位は、Git clone したリポジトリ直下です。
 モジュール名は `Zengin::Pl`、ディストリビューション名は `Zengin-Pl` です。
 `Zengin::Client` は後方互換のために残しています。
+
+# WEB
+
+[全銀協コード検索](https://zengin.sironekotoro.com/) は、GitHub Pages で公開している
+銀行・支店コード検索 Web UI です。検索処理はブラウザ上で実行し、Web UI には独自の favicon / app icon も含まれます。
+
+Web 版は Pages ビルド時に銀行・支店データを生成・同梱せず、ブラウザから
+[zengin-data-mirror](https://github.com/sironekotoro/zengin-data-mirror) を直接参照します。
+データの基本 URL は次のとおりです。
+
+    https://raw.githubusercontent.com/sironekotoro/zengin-data-mirror/main/data
+
+ブラウザは起動時に `revision` を `cache: 'no-store'` で取得します。取得した値を
+cache-busting key として使い、`banks.json`、`branches/<bank_code>.json`、`updated_at` は
+それぞれ `?v=<revision>` 付きの URL から取得します。`revision` は
+`zengin-data-mirror` 自身の Git commit SHA ではなく、mirror が取り込んだ upstream
+`source-data` の状態を識別する値です。そのため raw URL の ref には使わず、データ URL の
+cache-busting にだけ使います。
+
+mirror 側のデータが更新されても、Pages を再ビルドする必要はありません。次回アクセス時に
+新しい `revision` が取得され、新しい URL でデータを読み込みます。`web/data/` を生成・同梱する
+以前の方式は廃止済みです。Web UI 自体を変更した場合のみ、通常どおり Pages のデプロイが必要です。
 
 # INSTALLATION
 
@@ -117,14 +139,16 @@ zengin-pl-api のような呼び出し側が backend 情報を推測せず、そ
       base_url => 'https://raw.githubusercontent.com/sironekotoro/zengin-data-mirror/main/data',
       source   => {
         kind       => 'zengin-data-mirror',
-        revision   => undef,
-        updated_at => undef,
+        revision   => '647513f71c69505e09deb7a1da1717ec22dabedc',
+        updated_at => '20260630',
       },
     }
 
 `base_url` は現在実際に使っている値を返します。
-`source.revision` と `source.updated_at` は将来拡張用の枠として持っていますが、
-現時点では未実装のため `undef` を返します。
+`source.kind` は `'zengin-data-mirror'` 固定で、`source.revision` と
+`source.updated_at` は mirror の `revision` / `updated_at` から取得した値です。
+`revision` は40桁の16進値として検証され、小文字で返されます。通信や値の取得に失敗した場合は、
+その項目の値を取得できず、次回呼び出しで再取得されます。
 
 # METHODS
 
@@ -159,8 +183,8 @@ zengin-pl-api のような呼び出し側が backend 情報を推測せず、そ
 ## meta()
 
 backend 自身のメタ情報をハッシュリファレンスで返します。
-現在は `class`、`version`、`base_url` と、
-将来拡張用の `source.kind`、`source.revision`、`source.updated_at` を返します。
+現在は `class`、`version`、`base_url` と、mirror から取得した
+`source.kind`、`source.revision`、`source.updated_at` を返します。
 
 # TEST
 
