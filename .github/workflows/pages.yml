@@ -46,6 +46,11 @@ jobs:
         run: |
           test -f web/index.html
           test -f web/data-source.js
+          test -f web/favicon.svg
+          test -f web/favicon.ico
+          test -f web/favicon-16x16.png
+          test -f web/favicon-32x32.png
+          test -f web/apple-touch-icon.png
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3

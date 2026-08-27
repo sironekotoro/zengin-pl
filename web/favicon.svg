@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <title>全銀コード検索</title>
+  <path d="M15 16h34L17 48h29" fill="none" stroke="#3F51B5" stroke-linecap="round" stroke-linejoin="round" stroke-width="11"/>
+  <g fill="none" stroke="#fff" stroke-linecap="round">
+    <circle cx="43" cy="41" r="11.5" fill="#fff" stroke-width="9"/>
+    <path d="m51.5 49.5 7 7" stroke-width="9"/>
+  </g>
+  <g fill="none" stroke="#FF9F1C" stroke-linecap="round">
+    <circle cx="43" cy="41" r="11.5" stroke-width="5.5"/>
+    <path d="m51.5 49.5 7 7" stroke-width="5.5"/>
+  </g>
+</svg>
