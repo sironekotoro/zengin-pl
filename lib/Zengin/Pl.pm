@@ -4,6 +4,7 @@ use warnings;
 use utf8;
 use HTTP::Tiny;
 use JSON::XS;
+use Unicode::Normalize qw(NFKC);
 
 our $VERSION = "0.01";
 our $DEFAULT_BASE_URL
@@ -118,20 +119,32 @@ sub get_branch {
     return $branches->{$branch_code};
 }
 
+sub _normalize_search_text {
+    my ($value) = @_;
+    return q{} if !defined $value;
+
+    my $normalized = NFKC($value);
+    $normalized =~ tr/\x{30A1}-\x{30F6}/\x{3041}-\x{3096}/;
+    return $normalized;
+}
+
+sub _pattern_for {
+    my ($pat) = @_;
+    return $pat if ref $pat;
+    return qr/\Q@{[ _normalize_search_text($pat) ]}\E/i;
+}
+
 sub search {
     my ( $self, $bank_pat, $branch_pat ) = @_;
-    my $bank_rx = ref $bank_pat ? $bank_pat : qr/\Q$bank_pat\E/;
-    my $branch_rx =
-      defined $branch_pat
-      ? ( ref $branch_pat ? $branch_pat : qr/\Q$branch_pat\E/ )
-      : undef;
+    my $bank_rx   = _pattern_for($bank_pat);
+    my $branch_rx = defined $branch_pat ? _pattern_for($branch_pat) : undef;
 
     my $banks = $self->get_all_banks;
     my @matched_banks = grep {
         my $bank = $banks->{$_};
-        $bank->{name} =~ $bank_rx
-          || ( $bank->{kana} && $bank->{kana} =~ $bank_rx )
-          || ( $bank->{hira} && $bank->{hira} =~ $bank_rx )
+        _normalize_search_text( $bank->{name} ) =~ $bank_rx
+          || ( $bank->{kana} && _normalize_search_text( $bank->{kana} ) =~ $bank_rx )
+          || ( $bank->{hira} && _normalize_search_text( $bank->{hira} ) =~ $bank_rx )
           || ( $bank->{code} && $bank->{code} =~ $bank_rx )
     } keys %{$banks};
 
@@ -145,9 +158,9 @@ sub search {
         my $branches = $self->get_branches($code);
         for my $branch_code ( keys %{$branches} ) {
             my $branch = $branches->{$branch_code};
-            if (   $branch->{name} =~ $branch_rx
-                || ( $branch->{kana} && $branch->{kana} =~ $branch_rx )
-                || ( $branch->{hira} && $branch->{hira} =~ $branch_rx )
+            if (   _normalize_search_text( $branch->{name} ) =~ $branch_rx
+                || ( $branch->{kana} && _normalize_search_text( $branch->{kana} ) =~ $branch_rx )
+                || ( $branch->{hira} && _normalize_search_text( $branch->{hira} ) =~ $branch_rx )
                 || ( $branch->{code} && $branch->{code} =~ $branch_rx ) )
             {
                 push @results, $branch;
@@ -208,6 +221,12 @@ Zengin::Pl は、全銀協コードの JSON データを Perl から取得・検
 =head2 search($bank_pattern, [$branch_pattern])
 
 部分一致または正規表現で銀行名／支店名を検索します。
+
+文字列パターンを渡した場合、比較は Unicode 正規化(NFKC)によって
+半角/全角・英字の大文字小文字・半角カナ/全角カナの違いを吸収した上で
+行われます(元データやパターン文字列そのものは変更しません)。
+正規表現(C<qr//>)を渡した場合はこの正規化は行わず、従来通り渡した
+正規表現がそのまま使われます。
 
 =head2 meta()
 
