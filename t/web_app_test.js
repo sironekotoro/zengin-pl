@@ -16,8 +16,9 @@
 const path = require('path');
 const root = path.resolve(__dirname, '..');
 
-// Provide global ZenginSearch (search.js dependency of app.js)
+// Provide global ZenginSearch / ZenginData (app.js dependencies)
 require(path.join(root, 'web', 'search.js'));
+require(path.join(root, 'web', 'data-source.js'));
 const ZenginApp = require(path.join(root, 'web', 'app.js'));
 
 const failures = [];

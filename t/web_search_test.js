@@ -7,8 +7,7 @@
 //   - それ以外は name/kana/hira/code へのリテラル部分一致（roma は対象外）
 //   - 結果は bank code / branch code の昇順で安定ソート
 //
-// 前提: 事前に `perl tools/generate_web_data.pl` を実行し web/data を生成
-//（t/ 配下に生成済みデータがない場合は t/21.web_search.t 側でスキップされる）。
+// t/fixtures/web-data の小さな固定 fixture を使う。Pages build はデータを生成しない。
 
 const fs = require('fs');
 const path = require('path');
@@ -16,13 +15,14 @@ const path = require('path');
 const root = path.resolve(__dirname, '..');
 const ZenginSearch = require(path.join(root, 'web', 'search.js'));
 
-const banks = JSON.parse(
-    fs.readFileSync(path.join(root, 'web', 'data', 'banks.json'), 'utf8')
-);
+const fixtureRoot = path.join(root, 't', 'fixtures', 'web-data');
+const dataRoot = fixtureRoot;
+
+const banks = JSON.parse(fs.readFileSync(path.join(dataRoot, 'banks.json'), 'utf8'));
 
 function loadBranches(code) {
     return JSON.parse(
-        fs.readFileSync(path.join(root, 'web', 'data', 'branches', code + '.json'), 'utf8')
+        fs.readFileSync(path.join(dataRoot, 'branches', code + '.json'), 'utf8')
     );
 }
 
@@ -94,6 +94,74 @@ check('存在しない銀行は 0 件',
     check('東京 は昇順', isSortedByCode(r), JSON.stringify(codes(r)));
 }
 
+// --- 検索比較専用の Unicode 正規化（入力欄の表示値は変更しない） ---
+{
+    const equivalentQueries = ['ﾐｽﾞﾎ', 'ミズホ', 'みずほ'];
+    for (const query of equivalentQueries) {
+        const r = ZenginSearch.searchBanks(banks, query);
+        check('銀行 ' + query + ' は 0001 に一致', r.length === 1 && r[0].code === '0001',
+            JSON.stringify(codes(r)));
+    }
+
+    const halfwidthMultiple = ZenginSearch.searchBanks(banks, 'ﾐﾂﾋﾞｼ');
+    check('半角カナ銀行検索は複数候補に一致',
+        codes(halfwidthMultiple).includes('0005') && codes(halfwidthMultiple).includes('0006'),
+        JSON.stringify(codes(halfwidthMultiple)));
+
+    const halfwidthTokyo = ZenginSearch.searchBanks(banks, 'ﾄｳｷﾖｳ');
+    check('半角カナ銀行検索は東京候補に一致',
+        codes(halfwidthTokyo).includes('0010') && codes(halfwidthTokyo).includes('0020'),
+        JSON.stringify(codes(halfwidthTokyo)));
+
+    const fullwidthCode = ZenginSearch.searchBanks(banks, '０００１');
+    check('全角数字コード検索は 0001 に一致',
+        fullwidthCode.length === 1 && fullwidthCode[0].code === '0001',
+        JSON.stringify(codes(fullwidthCode)));
+
+    const normalizations = [
+        ['ｶﾞ', 'が'],
+        ['ﾊﾟ', 'ぱ'],
+        ['ｰ', 'ー'],
+        ['ｬ', 'ゃ'],
+        ['ｭ', 'ゅ'],
+        ['ｮ', 'ょ'],
+        ['ｯ', 'っ'],
+    ];
+    for (const pair of normalizations) {
+        check(pair[0] + ' は比較用に ' + pair[1] + ' へ正規化',
+            ZenginSearch.normalizeSearchText(pair[0]) === pair[1]);
+    }
+
+    // fixture にない濁点・半濁点・小書き・長音も、実データと同じ name/kana/hira の
+    // いずれかに半角入力で到達できることを確認する。
+    const specialBanks = {
+        '1000': { code: '1000', name: 'ガス銀行', kana: 'ガス', hira: 'がす' },
+        '1001': { code: '1001', name: 'パス銀行', kana: 'パス', hira: 'ぱす' },
+        '1002': { code: '1002', name: 'キョウ銀行', kana: 'キョウ', hira: 'きょう' },
+        '1003': { code: '1003', name: 'キー銀行', kana: 'キー', hira: 'きー' },
+    };
+    const voiced = ZenginSearch.searchBanks(specialBanks, 'ｶﾞｽ');
+    check('濁点を含む半角カナ銀行検索', voiced.length === 1 && voiced[0].code === '1000',
+        JSON.stringify(codes(voiced)));
+    const semiVoiced = ZenginSearch.searchBanks(specialBanks, 'ﾊﾟｽ');
+    check('半濁点を含む半角カナ銀行検索', semiVoiced.length === 1 && semiVoiced[0].code === '1001',
+        JSON.stringify(codes(semiVoiced)));
+    const smallKana = ZenginSearch.searchBanks(specialBanks, 'ｷｮｳ');
+    check('小書き文字を含む半角カナ銀行検索', smallKana.length === 1 && smallKana[0].code === '1002',
+        JSON.stringify(codes(smallKana)));
+    const longVowel = ZenginSearch.searchBanks(specialBanks, 'ｷｰ');
+    check('長音を含む半角カナ銀行検索', longVowel.length === 1 && longVowel[0].code === '1003',
+        JSON.stringify(codes(longVowel)));
+
+    // app.js のインクリメンタル検索が使う search + limitResults 経路を確認する。
+    const bankSuggestions = ZenginSearch.limitResults(
+        ZenginSearch.searchBanks(banks, 'ﾐｽﾞﾎ'), 8
+    );
+    check('銀行インクリメンタル検索でも半角カナが有効',
+        bankSuggestions.items.length === 1 && bankSuggestions.items[0].code === '0001',
+        JSON.stringify(bankSuggestions));
+}
+
 // --- 検索部分の部分一致の意味論（支店） ---
 {
     const branches = loadBranches('0001');
@@ -105,6 +173,27 @@ check('存在しない銀行は 0 件',
 
     const notFound = ZenginSearch.searchBranches(branches, '存在しない支店');
     check('存在しない支店は 0 件', notFound.length === 0, JSON.stringify(codes(notFound)));
+
+    const halfwidth = ZenginSearch.searchBranches(branches, 'ﾄｳｷﾖｳ');
+    check('半角カナ支店検索は東京候補に一致',
+        codes(halfwidth).includes('001') && codes(halfwidth).includes('002'),
+        JSON.stringify(codes(halfwidth)));
+    const hiragana = ZenginSearch.searchBranches(branches, 'とうきよう');
+    check('ひらがな支店検索は東京候補に一致',
+        codes(hiragana).includes('001') && codes(hiragana).includes('002'),
+        JSON.stringify(codes(hiragana)));
+    const fullwidthCode = ZenginSearch.searchBranches(branches, '００１');
+    check('全角数字支店コード検索は 001 に一致',
+        fullwidthCode.length === 1 && fullwidthCode[0].code === '001',
+        JSON.stringify(codes(fullwidthCode)));
+
+    const branchSuggestions = ZenginSearch.limitResults(
+        ZenginSearch.searchBranches(branches, 'ﾄｳｷﾖｳ'), 10
+    );
+    check('支店インクリメンタル検索でも半角カナが有効',
+        branchSuggestions.items.length === 2 &&
+            branchSuggestions.items.every(branch => ['001', '002'].includes(branch.code)),
+        JSON.stringify(branchSuggestions));
 }
 
 // --- コピーボタン ---

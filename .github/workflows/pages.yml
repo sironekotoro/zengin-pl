@@ -6,10 +6,9 @@ on:
       - master
     paths:
       - 'web/**'
-      - 'tools/generate_web_data.pl'
       - 'lib/**'
       - 't/**'
-      - '!.github/**'
+      - '.github/workflows/pages.yml'
   workflow_dispatch:
 
 permissions:
@@ -39,27 +38,19 @@ jobs:
       - name: Install dependencies
         run: cpanm -nq --installdeps .
 
-      - name: Generate web data
-        run: |
-          perl tools/generate_web_data.pl
-
       - name: Run tests
         run: |
           prove -lr t
 
-      - name: Verify web data
+      - name: Verify web assets
         run: |
-          echo "Checking banks.json..."
-          BANK_COUNT=$(jq '. | length' web/data/banks.json)
-          echo "Bank count: $BANK_COUNT"
-          
-          echo "Checking branches..."
-          BRANCH_COUNT=$(ls -1 web/data/branches/ | wc -l)
-          echo "Branch files: $BRANCH_COUNT"
-          
-          echo "Verifying JSON syntax..."
-          jq empty web/data/banks.json
-          jq empty web/data/meta.json
+          test -f web/index.html
+          test -f web/data-source.js
+          test -f web/favicon.svg
+          test -f web/favicon.ico
+          test -f web/favicon-16x16.png
+          test -f web/favicon-32x32.png
+          test -f web/apple-touch-icon.png
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3

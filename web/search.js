@@ -5,25 +5,36 @@
         return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     }
 
+    // 検索比較専用の正規化。入力欄の表示値や元データは変更しない。
+    // NFKCで半角カナ・濁点/半濁点・長音・全角英数を揃えた後、
+    // カタカナをひらがなへ寄せることで、kana/hiraのどちらにも一致させる。
+    function normalizeSearchText(value) {
+        const normalized = String(value == null ? '' : value).normalize('NFKC');
+        return normalized.replace(/[\u30A1-\u30F6]/g, (ch) =>
+            String.fromCodePoint(ch.codePointAt(0) - 0x60)
+        );
+    }
+
     function matches(row, pattern, altNames) {
         if (!pattern) {
             return false;
         }
-        const rx = new RegExp(escapeRegExp(pattern), 'i');
+        const rx = new RegExp(escapeRegExp(normalizeSearchText(pattern)), 'i');
+        const matchesValue = (value) => value != null && rx.test(normalizeSearchText(value));
 
-        if (row.name && rx.test(row.name)) return true;
-        if (row.kana && rx.test(row.kana)) return true;
-        if (row.hira && rx.test(row.hira)) return true;
-        if (row.code && rx.test(row.code)) return true;
+        if (matchesValue(row.name)) return true;
+        if (matchesValue(row.kana)) return true;
+        if (matchesValue(row.hira)) return true;
         // 旧銀行名などの補助名称（任意）。CLI 仕様には無い Web 独自の拡張。
         if (altNames) {
             const names = altNames[row.code];
             if (names) {
                 for (const name of names) {
-                    if (name && rx.test(name)) return true;
+                    if (matchesValue(name)) return true;
                 }
             }
         }
+        if (matchesValue(row.code)) return true;
         return false;
     }
 
@@ -40,8 +51,9 @@
         if (!banksData || !pattern) {
             return [];
         }
-        if (/^\d+$/.test(pattern)) {
-            const exact = banksData[pattern];
+        const normalizedPattern = normalizeSearchText(pattern);
+        if (/^\d+$/.test(normalizedPattern)) {
+            const exact = banksData[normalizedPattern];
             return exact ? [exact] : [];
         }
 
@@ -60,8 +72,9 @@
         if (!branchesData || !pattern) {
             return [];
         }
-        if (/^\d+$/.test(pattern)) {
-            const exact = branchesData[pattern];
+        const normalizedPattern = normalizeSearchText(pattern);
+        if (/^\d+$/.test(normalizedPattern)) {
+            const exact = branchesData[normalizedPattern];
             return exact ? [exact] : [];
         }
 
@@ -101,6 +114,7 @@ function escapeHtml(text) {
 
     const ZenginSearch = {
         matches: matches,
+        normalizeSearchText: normalizeSearchText,
         searchBanks: searchBanks,
         searchBranches: searchBranches,
         escapeHtml: escapeHtml,

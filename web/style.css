@@ -416,6 +416,12 @@ footer a:hover {
     text-decoration: underline;
 }
 
+.data-updated-at {
+    margin-top: 0.2rem;
+    font-size: 0.78rem;
+    color: #888;
+}
+
 @media (max-width: 480px) {
     header {
         padding: 1rem;
