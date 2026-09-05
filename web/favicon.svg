@@ -1,12 +1,5 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <title>全銀コード検索</title>
-  <path d="M15 16h34L17 48h29" fill="none" stroke="#3F51B5" stroke-linecap="round" stroke-linejoin="round" stroke-width="11"/>
-  <g fill="none" stroke="#fff" stroke-linecap="round">
-    <circle cx="43" cy="41" r="11.5" fill="#fff" stroke-width="9"/>
-    <path d="m51.5 49.5 7 7" stroke-width="9"/>
-  </g>
-  <g fill="none" stroke="#FF9F1C" stroke-linecap="round">
-    <circle cx="43" cy="41" r="11.5" stroke-width="5.5"/>
-    <path d="m51.5 49.5 7 7" stroke-width="5.5"/>
-  </g>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <title>全銀協コード検索</title>
+  <rect x="24" y="24" width="464" height="464" rx="106" fill="#30475A"/>
+  <path d="M 253 224 Q 340 155 427 224 L 456 255 Q 393 326 407 402 Q 415 455 456 516 L 427 546 Q 340 615 253 546 L 224 516 Q 265 455 273 402 Q 287 326 224 255 Z" transform="translate(-16 -52) scale(.8)" fill="none" stroke="#fff" stroke-width="30" stroke-linejoin="round" stroke-linecap="round"/>
 </svg>
