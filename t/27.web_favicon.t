@@ -15,7 +15,7 @@ my %asset = map { $_ => File::Spec->catfile( $web_root, $_ ) } qw(
   apple-touch-icon.png
 );
 
-plan tests => 8;
+plan tests => 9;
 
 ok( ( grep { -f $asset{$_} } keys %asset ) == scalar keys %asset,
     'favicon assets are present' );
@@ -29,9 +29,11 @@ like( $html, qr{<link\s+rel="apple-touch-icon"\s+href="apple-touch-icon\.png"\s+
     'Apple touch icon is referenced' );
 
 my $svg = _read_text( $asset{'favicon.svg'} );
-like( $svg, qr{viewBox="0 0 64 64"}, 'SVG has a square viewBox' );
-like( $svg, qr{#3F51B5.*#FF9F1C|#FF9F1C.*#3F51B5}s,
-    'SVG uses the specified indigo and orange colors' );
+like( $svg, qr{viewBox="0 0 512 512"}, 'SVG has a square viewBox' );
+like( $svg, qr{#30475A}i,
+    'SVG uses the specified navy color' );
+like( $html, qr{<img\s+class="site-icon"\s+src="favicon\.svg"\s+alt=""},
+    'header displays the SVG icon' );
 
 is_deeply( [ _png_dimensions( $asset{'favicon-16x16.png'} ),
              _png_dimensions( $asset{'favicon-32x32.png'} ),
