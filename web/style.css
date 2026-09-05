@@ -21,9 +21,22 @@ header {
     text-align: center;
 }
 
+.site-title {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    margin-bottom: 0.25rem;
+}
+
+.site-icon {
+    width: 2rem;
+    height: 2rem;
+    flex: 0 0 auto;
+}
+
 header h1 {
     font-size: 1.5rem;
-    margin-bottom: 0.25rem;
 }
 
 header p {
