@@ -5,6 +5,13 @@ on:
   pull_request:
   workflow_dispatch:
 
+# このworkflowはテスト実行のみでrepositoryへの書き込みを行わないため、
+# GITHUB_TOKENの権限をread-onlyに絞る。zengin-pl-apiのcross-repo同期は
+# この権限を使わず、zengin-pl-api側が自分自身のGITHUB_TOKENでpull型に
+# 追随する(zengin-pl側からの書き込み・通知は行わない)。
+permissions:
+  contents: read
+
 jobs:
   build:
     runs-on: ubuntu-latest
