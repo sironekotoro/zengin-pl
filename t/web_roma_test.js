@@ -13,6 +13,7 @@ const { spawn } = require('node:child_process');
 const { mkdtempSync, rmSync, cpSync, existsSync, mkdirSync, writeFileSync } = require('node:fs');
 const { tmpdir } = require('node:os');
 const { join, resolve } = require('node:path');
+const net = require('node:net');
 
 const repoRoot = resolve(__dirname, '..');
 
@@ -30,10 +31,24 @@ if (!chromePath) {
     process.exit(0);
 }
 
-const HTTP_PORT = 8645;
-const CDP_PORT = 9341;
-
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+
+// 固定ポートだと、同一CI job内でt/23・t/25・t/26が順にこのscriptを起動する際、
+// 直前のプロセスがportを解放しきる前に次のChrome/HTTPサーバーがbindを試み、
+// 「portが塞がっているのにChrome自体は正常起動して見える」レースが起こり得る。
+// これが `timeout waiting for cdp target` の疑わしい原因の一つのため、
+// 都度OSに空きportを選ばせることでこのレース自体を排除する。
+function getFreePort() {
+    return new Promise((resolve, reject) => {
+        const srv = net.createServer();
+        srv.unref();
+        srv.on('error', reject);
+        srv.listen(0, '127.0.0.1', () => {
+            const { port } = srv.address();
+            srv.close(() => resolve(port));
+        });
+    });
+}
 
 async function waitFor(fn, timeoutMs, label) {
     const start = Date.now();
@@ -45,6 +60,33 @@ async function waitFor(fn, timeoutMs, label) {
         await sleep(200);
     }
     throw new Error('timeout waiting for ' + label);
+}
+
+// waitForに「監視対象processが既に終了していたら、timeoutを待たず即座に
+// 診断情報付きで失敗させる」段階的な起動判定を加えたもの。
+// 成功時は通常のwaitForと同じく静かに値を返す(ログを増やさない)。
+async function waitForWithProcessGuard(child, label, timeoutMs, checkFn, buildDiagnostics) {
+    const start = Date.now();
+    let lastError;
+    while (Date.now() - start < timeoutMs) {
+        if (processExited(child)) {
+            const diag = buildDiagnostics ? await buildDiagnostics(lastError) : '';
+            throw new Error(
+                `${label}: process exited before condition was met ` +
+                `(code=${child.exitCode}, signal=${child.signalCode})` +
+                (diag ? `\n${diag}` : '')
+            );
+        }
+        try {
+            const v = await checkFn();
+            if (v) return v;
+        } catch (e) {
+            lastError = e;
+        }
+        await sleep(200);
+    }
+    const diag = buildDiagnostics ? await buildDiagnostics(lastError) : '';
+    throw new Error(`timeout waiting for ${label}${diag ? `\n${diag}` : ''}`);
 }
 
 function processExited(child) {
@@ -167,6 +209,34 @@ class Cdp {
     close() { this.ws.close(); }
 }
 
+// `timeout waiting for cdp target` などが再発したときに原因を追えるよう、
+// 失敗時にのみ集める診断情報。成功時はこの関数自体を呼ばないため、
+// 通常runのログ量は増えない。
+async function collectCdpDiagnostics(chromeChild, cdpPort, stderrTail, lastError) {
+    const lines = [];
+    lines.push(`Chrome PID: ${chromeChild.pid}`);
+    lines.push(
+        `Chrome process exited: ${processExited(chromeChild)}` +
+        ` (code=${chromeChild.exitCode}, signal=${chromeChild.signalCode})`
+    );
+    if (lastError) lines.push(`last poll error: ${lastError.message || lastError}`);
+
+    for (const path of ['/json/version', '/json/list']) {
+        try {
+            const res = await fetch(`http://127.0.0.1:${cdpPort}${path}`, {
+                signal: AbortSignal.timeout(2000),
+            });
+            const body = await res.text();
+            lines.push(`${path}: HTTP ${res.status} ${body}`);
+        } catch (e) {
+            lines.push(`${path}: fetch failed (${e.message})`);
+        }
+    }
+
+    lines.push(`Chrome stderr (tail):\n${stderrTail() || '(empty)'}`);
+    return lines.join('\n');
+}
+
 const failures = [];
 const processFailures = [];
 function recordProcessFailure(label, detail) {
@@ -220,6 +290,12 @@ function writeFixture(tmpWeb) {
     cpSync(join(repoRoot, 'web'), tmpWeb, { recursive: true });
     writeFixture(tmpWeb);
 
+    // t/23・t/25・t/26は同一CI job内でこのscriptを毎回別プロセスとして順に
+    // 起動する。固定portだとprocess終了直後でもOS側のport解放が間に合わず
+    // bindが失敗する(のに気づけない)raceがあり得るため、都度空きportを取る。
+    const HTTP_PORT = await getFreePort();
+    const CDP_PORT = await getFreePort();
+
     const httpServer = spawn('python3', ['-m', 'http.server', String(HTTP_PORT), '--bind', '127.0.0.1'], {
         cwd: tmpWeb,
         stdio: 'ignore',
@@ -227,6 +303,7 @@ function writeFixture(tmpWeb) {
     const httpServerState = monitorProcess(httpServer, 'HTTP server');
 
     const chromeProfile = mkdtempSync(join(tmpdir(), 'zengin-roma-cp-'));
+    // stderrだけpipeして、失敗時のみtailを診断情報として出す(成功時は破棄)。
     const chrome = spawn(chromePath, [
         '--headless=new',
         '--disable-gpu',
@@ -234,21 +311,43 @@ function writeFixture(tmpWeb) {
         `--remote-debugging-port=${CDP_PORT}`,
         `--user-data-dir=${chromeProfile}`,
         'about:blank',
-    ], { stdio: 'ignore' });
+    ], { stdio: ['ignore', 'ignore', 'pipe'] });
+    const chromeStderrChunks = [];
+    chrome.stderr.on('data', (chunk) => {
+        chromeStderrChunks.push(chunk.toString());
+        if (chromeStderrChunks.length > 200) chromeStderrChunks.shift();
+    });
+    const chromeStderrTail = () => chromeStderrChunks.join('').slice(-4000);
     const chromeState = monitorProcess(chrome, 'Chrome');
     let cdp;
 
     try {
-        await waitFor(async () => {
-            const res = await fetch(`http://127.0.0.1:${HTTP_PORT}/index.html`);
-            return res.ok;
-        }, 10000, 'http server');
+        await waitForWithProcessGuard(
+            httpServer,
+            'http server',
+            10000,
+            async () => {
+                const res = await fetch(`http://127.0.0.1:${HTTP_PORT}/index.html`);
+                return res.ok;
+            }
+        );
 
-        const target = await waitFor(async () => {
-            const res = await fetch(`http://127.0.0.1:${CDP_PORT}/json/list`);
-            const list = await res.json();
-            return list.find(t => t.type === 'page');
-        }, 10000, 'cdp target');
+        // CDP targetの出現待ち。processが既に死んでいれば10〜15秒待たず
+        // 即座に(exit code/signal付きで)失敗させ、timeoutした場合のみ
+        // Chrome PID・/json/version・/json/list・stderr tailを集めて添える。
+        // 10秒→15秒への延長はこの段階的判定・診断とセットで行う。原因不明の
+        // まま数字だけ伸ばしているわけではない(詳細はコミットメッセージ参照)。
+        const target = await waitForWithProcessGuard(
+            chrome,
+            'cdp target',
+            15000,
+            async () => {
+                const res = await fetch(`http://127.0.0.1:${CDP_PORT}/json/list`);
+                const list = await res.json();
+                return list.find(t => t.type === 'page');
+            },
+            (lastError) => collectCdpDiagnostics(chrome, CDP_PORT, chromeStderrTail, lastError)
+        );
 
         cdp = new Cdp(target.webSocketDebuggerUrl);
         await cdp.ready();
@@ -258,9 +357,33 @@ function writeFixture(tmpWeb) {
             source: "window.ZenginDataConfig = { baseUrl: 'data' };"
         });
         await cdp.send('Page.navigate', { url: `http://127.0.0.1:${HTTP_PORT}/index.html` });
-        await sleep(1500);
 
-        const updatedAt = await cdp.eval(`document.getElementById('data-updated-at').textContent`);
+        // 固定sleep(1500ms)で一度だけ読むのではなく、初期表示(読み込み中...)
+        // から実際に変化する(成功/失敗いずれかの最終表示になる)まで状態
+        // ベースで待つ。CI負荷でJSのfetch/DOM更新が遅れても、無駄に長く
+        // 待たせず・かつ早すぎる読み取りで「読み込み中」を掴まないようにする。
+        // timeoutしても例外は投げず、その時点の値のままcheck()へ進める
+        // (読み込み中のままPASSにはならない。既存のcheck()が正しくFAILを
+        // 報告する。診断のためreadyState等だけ追加で出す)。
+        const LOADING_TEXT = 'データ更新日: 読み込み中...';
+        let updatedAt;
+        try {
+            updatedAt = await waitFor(async () => {
+                const text = await cdp.eval(`document.getElementById('data-updated-at').textContent`);
+                return text && text !== LOADING_TEXT ? text : null;
+            }, 8000, 'data-updated-at to leave loading state');
+        } catch (e) {
+            updatedAt = await cdp.eval(`document.getElementById('data-updated-at').textContent`);
+            const readyState = await cdp.eval('document.readyState');
+            const errorMessage = await cdp.eval(`document.getElementById('error-message').textContent`);
+            console.warn(
+                `${e.message}\n` +
+                `  document.readyState: ${readyState}\n` +
+                `  data-updated-at: ${JSON.stringify(updatedAt)}\n` +
+                `  error-message: ${JSON.stringify(errorMessage)}`
+            );
+        }
+
         if (process.env.TEST_REVISION_FAILURE) {
             check('revision失敗時に更新日を利用不可表示にする', updatedAt.includes('取得できません'), updatedAt);
             await cdp.eval(`(async () => {
